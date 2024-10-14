@@ -42,6 +42,12 @@ class ComunicationPressure:
             print(f"Error al enviar la instruccion: {e}")
             return 0
 
+    def set_point(self, number):
+        print(f"numero: {number}")
+        msg = f"PSN {number} KPA\r\n"
+        print(msg)
+        self.conn_bomb.write(msg.encode('ascii'))
+
     def get_patron_caj(self, pressure_value):
         # Formula pressure_caj
         pressure_caj = (pressure_value * self.pa_a1) + self.pa_a0

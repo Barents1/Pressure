@@ -3,6 +3,7 @@ from PyQt5 import QtWidgets
 from gui.slide_pressure import SliderExample
 from gui.gui_switch import SwitchButton
 from utils.connection_utils import ConnectionUtils
+from styles.style_pyqt5 import Style
 
 class UIManager:
     def __init__(self, main_window):
@@ -12,6 +13,7 @@ class UIManager:
     def initialize_ui(self):
         self.load_components()
         self.load_rute()
+        self.styles_components()
         #self.set_value_slide()
 
     def load_components(self):
@@ -51,15 +53,40 @@ class UIManager:
         if not self.main_window.inp_a0.isEnabled():
             self.main_window.enable_button()
             self.main_window.btn_enable.setText("Deshabilitar")
+            Style.button_danger_style([self.main_window.btn_enable])
         else:
             self.main_window.disable_button()
             self.main_window.btn_enable.setText("Habilitar")
+            Style.button_success_style([self.main_window.btn_enable])
 
     def toggle_button_time_state(self):
         if not self.main_window.inp_time_duration.isEnabled():
             self.main_window.enable_time()
             self.main_window.btn_time_duration.setText("Deshabilitar")
+            Style.button_danger_style([self.main_window.btn_time_duration])
         else:
             self.main_window.disable_time()
             self.main_window.btn_time_duration.setText("Habilitar")
-    
+            Style.button_success_style([self.main_window.btn_time_duration])
+
+    def styles_components(self):
+        Style.button_success_style([
+            self.main_window.btn_enable])
+        Style.button_danger_style([
+            self.main_window.btn_time_duration])
+        """
+        Style.button_success_style([
+            self.btn_test_bomb1,
+            self.btn_enviar_bomb1
+            ])
+        Style.button_warning_style([
+            self.btn_test_bomb2,
+            self.btn_enviar_bomb2
+        ])
+        Style.button_primary_style([
+            self.btn_clean_bomb1,
+            self.btn_clean_bomb2])
+        Style.button_danger_style([
+            self.btn_detener_bomb1,
+            self.btn_detener_bomb2])
+    """

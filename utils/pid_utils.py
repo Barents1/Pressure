@@ -1,14 +1,15 @@
-from PyQt5 import QtWidgets
+#from PyQt5 import QtWidgets
 
 class ComunicacionPid:
     def __init__(self):
         self.ErrApag = -0.258
         self.t_muestreo = 1228
+        self.value_100 = 0
         
         # constantes PID
         self.KP = 0.054236
         self.KI = 0.0010894
-        self.KD = 0.25123  # Cambié KP por KD ya que parece que fue un error en tu código
+        self.KD = 0.25123
 
         # Límites
         self.L_min = 86
@@ -34,8 +35,8 @@ class ComunicacionPid:
 
     def control_loop(self):
         while not self.stop:
-            # Condición principal (botón) que sería el "Case Selector" en LabVIEW
-            if True:  # Suponiendo que el selector está en True, puedes reemplazarlo por tu botón
+            # "Case Selector" en LabVIEW
+            if True:
                 # While loop secundario
                 while True:
                     # Igual a 0? (Equal To 0? Function)
@@ -80,14 +81,100 @@ class ComunicacionPid:
                     self.update_leds(led_1, led_2)
 
     def update_leds(self, led_1, led_2):
-        # Esta función actualizaría los LEDs en la interfaz gráfica
         print(f"LED 1: {'ON' if led_1 else 'OFF'}, LED 2: {'ON' if led_2 else 'OFF'}")
 
     def stop_loop(self):
-        # Método para detener el bucle
         self.stop = True
 
-#pid_control = ComunicacionPid()
+    def pid_control_error(self, errApag):
+        result = 0
+        i = 0
+        if i == 0:
+            result = 1
+        else: 
+            result = errApag
+        
+        if result >= -1 and result <= 0:
+            result = 1
+        else:
+            result = 0
+        # funcion para adicion
+        #if result >= 30 or
+
+    # principal a llamar
+    def pid_analog_output(self, set_point):
+        t_muestreo = self.t_muestreo / 100
+        val_process_err = self.get_error_Apag(set_point)
+        print(f"val_process_err: {val_process_err}")
+
+        value_GD = self.get_value_GD(t_muestreo, val_process_err)
+        value_proportional = self.get_value_proportional(val_process_err)
+        value_GI = self.get_value_GI(val_process_err, t_muestreo) #posible set_point por Ui anterior
+
+        value_PIDT = value_proportional + value_GI
+        value_PIDT = value_PIDT + value_GD
+
+        print(f"value_PIDT: {value_PIDT}")
+        print(f"value_100: {self.value_100}")
+        value_voltage_AO0 = self.get_voltage_AOC(value_PIDT)
+        print(f"value_100: {self.value_100}")
+        print(f"value_voltage_AO0: {value_voltage_AO0}")
+
+    def get_voltage_AOC(self, value_PIDT):
+        if value_PIDT >= self.L_max:
+            result = self.L_max
+        else: 
+            result = value_PIDT
+        
+        if result <= self.L_min:
+            value_voltage_AO0 = self.L_min
+        else:
+            value_voltage_AO0 = result
+
+        self.value_100 = value_voltage_AO0
+        value_voltage_AO0 = value_voltage_AO0 * 0.023
+        value_voltage_AO0 = value_voltage_AO0 + 1.0167
+
+        return value_voltage_AO0
+
+    def get_value_GD(self, t_muestreo, val_process_err):
+        result = val_process_err - 0
+        result = val_process_err * self.KD
+        value_GD = result / t_muestreo
+        return value_GD
+    
+    def get_value_GI(self, val_process_err, t_muestreo):
+        #incompleto
+        result = val_process_err * self.KI
+        result = result * t_muestreo
+        value_GI = result + self.conditional_gi()
+        return value_GI
+
+    def conditional_gi(self):
+        ui_previous = 0 # cambiar
+        if ui_previous >= self.L_max:
+            result_max = self.L_max
+        else:
+            result_max = ui_previous
+
+        if result_max <= self.L_min:
+            result_min = self.L_min
+        else:
+            result_min = result_max
+
+        return result_min
+    
+    def get_value_proportional(self, val_process_err):
+        result = val_process_err * self.KP
+        return result
+
+    def get_error_Apag(self, set_point):
+        err_Apag = set_point - self.proccess_variable
+        return err_Apag
+
+pid_control = ComunicacionPid()
+pid_control.pid_analog_output(500)
+
 #pid_control.control_loop()
 """
 from PyQt5 import QtWidgets
@@ -119,7 +206,7 @@ class ComunicacionPid:
         self.num_100 = None
 
     def control_loop(self, stop_button, stop_principal):
-        """Simulación del Case Structure con un While Loop secundario."""
+        Simulación del Case Structure con un While Loop secundario.
 
         # Inicialización de variables
         result_add = 0
