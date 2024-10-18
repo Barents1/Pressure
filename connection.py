@@ -1,7 +1,6 @@
 from PyQt5 import QtWidgets, QtCore
 from utils.connection_utils import ConnectionUtils
-from utils.comunication_utils_1 import ComunicationPressure
-from utils.comunication_utils import ComunicationSerial
+from utils.comunication_utils import ComunicationPressure
 import time
 import os
 import csv
@@ -24,7 +23,7 @@ class PressureDataThread(QtCore.QThread):
         self._lock = QtCore.QMutex() 
         self.output_dir = output_dir
         self.save_data = True
-        self.change_pressure = 0
+        self.change_pressure = None
         self.enable_time_check = enable_time_check
 
     def get_csv_filename(self):
@@ -39,12 +38,12 @@ class PressureDataThread(QtCore.QThread):
     def run(self):
         time_initial = time.time()
         comunication = ComunicationPressure(self.conn_bomb)
-        pa_a0 = comunication.pa_a0
-        pa_a1 = comunication.pa_a1
+        pa_a0 = str(comunication.pa_a0).replace('.', ',')
+        pa_a1 = str(comunication.pa_a1).replace('.', ',')
 
         csv_filename = self.get_csv_filename()
         with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
+            writer = csv.writer(file, delimiter=';')
             writer.writerow(["Fecha", "Hora", "Patron SAJ", "PA_A0", "PA_A1", "Patron CAJ"])
 
             while self.is_running:
@@ -53,6 +52,10 @@ class PressureDataThread(QtCore.QThread):
 
                 value_pressure = comunication.get_pressure()
                 value_caj = comunication.get_patron_caj(value_pressure)
+
+                value_pressure = round(value_pressure, 6)
+                value_caj = round(value_caj, 6)
+
                 self.pressure_value_signal.emit(value_pressure)
                 self.caj_value_signal.emit(value_caj)
 
@@ -66,6 +69,10 @@ class PressureDataThread(QtCore.QThread):
                     date_data = comunication.get_date()
                     time_data = comunication.get_time()
                     patron_caj = comunication.get_patron_caj(patron_saj)
+
+                    patron_saj = f"{round(patron_saj, 6):.6f}".replace('.', ',')
+                    patron_caj = f"{round(patron_caj, 6):.6f}".replace('.', ',')
+
                     list_data = [date_data, time_data, patron_saj, pa_a0, pa_a1, patron_caj]
 
                     self.data_ready.emit(list_data)
@@ -75,17 +82,19 @@ class PressureDataThread(QtCore.QThread):
                     
                 time.sleep(1)
 
-                if self.change_pressure <= value_pressure:
-                    self.change_pressure = value_pressure - self.change_pressure
-                    self.value_change_pressure.emit(self.change_pressure)
-                else: 
-                    self.change_pressure = self.change_pressure - value_pressure
-                    self.value_change_pressure.emit(self.change_pressure)
+                if self.change_pressure is None:
+                    self.change_pressure = value_pressure
+                else:
+                    difference = value_pressure - self.change_pressure
+                    difference = round(difference, 6)
+                    self.value_change_pressure.emit(difference)
+                    self.change_pressure = value_pressure
 
                 elapsed_time = time.time() - time_initial
 
                 if current_enable_time_check:
                     if elapsed_time >= self.time_duration:
+                        elapsed_time = round(elapsed_time, 4)
                         self.finished_signal.emit(elapsed_time)
                         break
 
@@ -204,8 +213,8 @@ class ConnectionManager:
     def set_point(self):
         num_point = self.main_window.inp_set_point.text()
         if self.conn_bomb:
-            comunication = ComunicationSerial(self.conn_bomb)
-            comunication.set_point_example(num_point)
+            comunication = ComunicationPressure(self.conn_bomb)
+            comunication.set_point(num_point)
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
