@@ -24,7 +24,8 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
     def initialize_actions(self):
         self.cbx_conn.activated.connect(self.connection.check_port)
         self.btn_save_rute.clicked.connect(self.ui_manager.save_rute)
-        self.btn_connect.clicked.connect(self.connection.connect_bomb)
+        self.btn_connect.clicked.connect(self.connection.connect_device)
+        self.btn_start.clicked.connect(self.connection.start_device)
         self.btn_stop_conn.clicked.connect(self.connection.close_bomb)
         self.btn_start_conn.clicked.connect(self.connection.set_point)
         self.btn_enable.clicked.connect(self.ui_manager.toggle_button_state)

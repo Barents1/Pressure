@@ -13,8 +13,9 @@ class ComunicationPressure:
         self.pa_a1 = 1.0000782
 
         self.data_test = 729.011
-    """
+    
     def value_pressure(self):
+        #num = "R,729.011"
         num = "R,729.011 hPa a,-0.000 hPa/s,724.0399 hPa a"
         return num
     """
@@ -22,32 +23,43 @@ class ComunicationPressure:
         num = self.data_test + 1.011
         self.data_test = num
         return num
-
+    """
     def get_pressure(self):
-        if self.conn_bomb is None or not self.conn_bomb.is_open:
+        if self.conn_bomb is None:
             QtWidgets.QMessageBox.critical(
                 None, "Error", "La conexión no es válida"
             )
             return
         try:
-            #msg = "*IDN?\r\n"
             msg = "PRR\r\n"
-            #msg = "PR1?\r\n"
             
             self.conn_bomb.write(msg.encode('ascii'))
             time.sleep(0.1)
-            request = self.conn_bomb.readline().decode('ascii').strip()
+            request = self.conn_bomb.readline(10).decode('ascii').strip()
             
             #request = self.value_pressure()
             #num_1 = request
-
+            
             numbers = re.findall(r'-?\d+\.\d+', request)
+
             num_1 = float(numbers[0])
-            num_2 = float(numbers[1])
-            num_3 = float(numbers[2])
+            #num_2 = float(numbers[1])
+            #num_3 = float(numbers[2])
 
             print(f"Respuesta del dispositivo: {num_1}")
             return num_1
+        
+            #if len(numbers) >= 3:
+                #num_1 = float(numbers[0])
+                #num_2 = float(numbers[1])
+                #num_3 = float(numbers[2])
+
+                #print(f"Respuesta del dispositivo: {num_1}")
+                #return num_1
+            #else:
+                #print("No se recibieron suficientes valores numéricos.")
+                #return 0
+
         except serial.SerialException as e:
             print(f"Error al enviar la instruccion: {e}")
             return 0
