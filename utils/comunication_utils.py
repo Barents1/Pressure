@@ -3,6 +3,8 @@ from datetime import datetime
 import time
 from PyQt5 import QtWidgets
 import re
+import nidaqmx
+from nidaqmx.system import System
 
 class ComunicationPressure:
     def __init__(self, conn_bomb):
@@ -11,9 +13,9 @@ class ComunicationPressure:
         self.patron_saj = None
         self.pa_a0 = -0.179608
         self.pa_a1 = 1.0000782
-
         self.data_test = 729.011
-    
+        self.system = System.local()
+    """
     def value_pressure(self):
         #num = "R,729.011"
         num = "R,729.011 hPa a,-0.000 hPa/s,724.0399 hPa a"
@@ -23,7 +25,7 @@ class ComunicationPressure:
         num = self.data_test + 1.011
         self.data_test = num
         return num
-    """
+    
     def get_pressure(self):
         if self.conn_bomb is None:
             QtWidgets.QMessageBox.critical(
@@ -33,16 +35,16 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             
-            self.conn_bomb.write(msg.encode('ascii'))
+            #self.conn_bomb.write(msg.encode('ascii'))
             time.sleep(0.1)
-            request = self.conn_bomb.readline(10).decode('ascii').strip()
+            #request = self.conn_bomb.readline(10).decode('ascii').strip()
             
-            #request = self.value_pressure()
-            #num_1 = request
+            request = self.value_pressure()
+            num_1 = request
             
-            numbers = re.findall(r'-?\d+\.\d+', request)
+            #numbers = re.findall(r'-?\d+\.\d+', request)
 
-            num_1 = float(numbers[0])
+            #num_1 = float(numbers[0])
             #num_2 = float(numbers[1])
             #num_3 = float(numbers[2])
 
@@ -84,3 +86,8 @@ class ComunicationPressure:
         current_time = datetime.now().strftime('%H:%M:%S')
         return current_time
     
+    def get_device_out(self):
+        for device in self.system.devices:
+            print(f"Dispositivo: {device.name}")
+            print(f"Canales de entrada analógica: {device.ai_physical_chans}")
+            print(f"Canales de salida analógica: {device.ao_physical_chans}")
