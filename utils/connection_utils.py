@@ -5,12 +5,24 @@ from pathlib import Path
 import serial
 import serial.tools.list_ports
 import os
+from datetime import datetime
 
 class ConnectionUtils:
     def __init__(self):
         self.conn_bomb = None
         self.desktop_path = Path.home() / "Desktop"
-        self.new_folder = self.desktop_path / "Presion"
+        self.new_folder = self.desktop_path / "Presion/Datos"
+
+    def create_month_folder(self):
+        current_month = datetime.now().strftime("%B")
+        month_folder = self.new_folder / current_month
+
+        try:
+            month_folder.mkdir(parents=True, exist_ok=True)
+            return month_folder
+        except Exception as e:
+            print(f"Error al crear la carpeta: {e}")
+            return None
 
     def load_port(self, combo):
         ports = serial.tools.list_ports.comports()
@@ -59,13 +71,17 @@ class ConnectionUtils:
                 file.write('')
 
         with open(file_path, 'r') as file:
-            content = Path(file.read())
+            content = file.read().strip()
 
-        if not content.exists():
-            content = str(self.new_folder)
-            self.new_folder.mkdir(parents=True, exist_ok=True)
+        if not content or not Path(content).exists():
+            folder_data = self.create_month_folder()
+            if folder_data is not None:
+                content = str(folder_data)
+                folder_data.mkdir(parents=True, exist_ok=True)
 
-        content = str(content)
+                with open(file_path, 'w') as file:
+                    file.write(content)
+
         return file_path, content
 
     def save_rute_to_file(self, file_name, folder_path):

@@ -80,6 +80,14 @@ class ComunicacionPid:
                     # Actualizar LEDs
                     self.update_leds(led_1, led_2)
 
+    def compare_set_point(self, set_point):
+        if set_point == 550:
+            self.L_max = 6
+            self.L_min = 0
+        elif set_point == 650 or set_point == 730 or set_point == 850 or set_point == 950 or set_point == 1050:
+            self.L_min = 86
+            self.L_max = 86
+
     def update_leds(self, led_1, led_2):
         print(f"LED 1: {'ON' if led_1 else 'OFF'}, LED 2: {'ON' if led_2 else 'OFF'}")
 

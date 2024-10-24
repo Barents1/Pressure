@@ -1,19 +1,54 @@
 from PyQt5 import QtWidgets, QtCore
 from utils.connection_utils import ConnectionUtils
-from utils.comunication_utils_1 import ComunicationPressure
-from utils.comunication_utils import ComunicationSerial
+from utils.comunication_utils import ComunicationPressure
+from utils.connection_daq_utils import AnalogInput
+from utils.connection_daq_utils import AnalogOutput
+from utils.connection_daq_utils import DigitalOutput
 import time
+import numpy as np
 import os
 import csv
 from datetime import datetime
 
-class PressureDataThread(QtCore.QThread):
+class PressureReaderThread(QtCore.QThread):
+    pressure_value_reader_signal = QtCore.pyqtSignal(float)
+    caj_value_reader_signal = QtCore.pyqtSignal(float)
+    value_change_reader_pressure = QtCore.pyqtSignal(float)
 
+    def __init__(self, conn_bomb):
+        super().__init__()
+        self.conn_bomb = conn_bomb
+        self.is_running = True
+        self.change_pressure = None
+
+    def run(self):
+        comunication = ComunicationPressure(self.conn_bomb)
+        while self.is_running:
+            
+            value_pressure = comunication.get_pressure()
+            value_caj = comunication.get_patron_caj(value_pressure)
+
+            self.pressure_value_reader_signal.emit(round(value_pressure, 6))
+            self.caj_value_reader_signal.emit(round(value_caj, 6))
+
+            if self.change_pressure is None:
+                self.change_pressure = value_pressure
+            else:
+                difference = value_pressure - self.change_pressure
+                difference = round(difference, 6)
+                self.value_change_reader_pressure.emit(difference)
+                self.change_pressure = value_pressure
+
+            time.sleep(2)
+
+    def stop(self):
+        self.is_running = False
+        self.quit()
+        self.wait()
+
+class PressureDataThread(QtCore.QThread):
     data_ready = QtCore.pyqtSignal(list)
-    finished_signal = QtCore.pyqtSignal(float)
-    pressure_value_signal = QtCore.pyqtSignal(float)
-    caj_value_signal = QtCore.pyqtSignal(float)
-    value_change_pressure = QtCore.pyqtSignal(float)
+    finished_data_signal = QtCore.pyqtSignal(float)
 
     def __init__(self, conn_bomb, num_chk, time_duration, output_dir, enable_time_check):
         super().__init__()
@@ -24,7 +59,6 @@ class PressureDataThread(QtCore.QThread):
         self._lock = QtCore.QMutex() 
         self.output_dir = output_dir
         self.save_data = True
-        self.change_pressure = 0
         self.enable_time_check = enable_time_check
 
     def get_csv_filename(self):
@@ -39,54 +73,47 @@ class PressureDataThread(QtCore.QThread):
     def run(self):
         time_initial = time.time()
         comunication = ComunicationPressure(self.conn_bomb)
-        pa_a0 = comunication.pa_a0
-        pa_a1 = comunication.pa_a1
+        pa_a0 = str(comunication.pa_a0).replace('.', ',')
+        pa_a1 = str(comunication.pa_a1).replace('.', ',')
 
         csv_filename = self.get_csv_filename()
         with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
+            writer = csv.writer(file, delimiter=';')
             writer.writerow(["Fecha", "Hora", "Patron SAJ", "PA_A0", "PA_A1", "Patron CAJ"])
 
             while self.is_running:
                 current_second = datetime.now().strftime('%S')
                 last_num = int(current_second[-1])
 
-                value_pressure = comunication.get_pressure()
-                value_caj = comunication.get_patron_caj(value_pressure)
-                self.pressure_value_signal.emit(value_pressure)
-                self.caj_value_signal.emit(value_caj)
-
                 self._lock.lock()
                 current_num_chk = self.num_chk
                 current_enable_time_check = self.enable_time_check
                 self._lock.unlock()
 
-                if last_num == current_num_chk:
-                    patron_saj = comunication.get_pressure()
-                    date_data = comunication.get_date()
-                    time_data = comunication.get_time()
-                    patron_caj = comunication.get_patron_caj(patron_saj)
-                    list_data = [date_data, time_data, patron_saj, pa_a0, pa_a1, patron_caj]
+                if self.save_data:
+                    if last_num == current_num_chk:
 
-                    self.data_ready.emit(list_data)
+                        time_data = comunication.get_time()
+                        patron_saj = comunication.get_pressure()
+                        date_data = comunication.get_date()
+                        patron_caj = comunication.get_patron_caj(patron_saj)
 
-                    if self.save_data:
+                        patron_saj = f"{round(patron_saj, 6):.6f}".replace('.', ',')
+                        patron_caj = f"{round(patron_caj, 6):.6f}".replace('.', ',')
+
+                        list_data = [date_data, time_data, patron_saj, pa_a0, pa_a1, patron_caj]
+
+                        self.data_ready.emit(list_data)
                         writer.writerow(list_data)
-                    
-                time.sleep(1)
 
-                if self.change_pressure <= value_pressure:
-                    self.change_pressure = value_pressure - self.change_pressure
-                    self.value_change_pressure.emit(self.change_pressure)
-                else: 
-                    self.change_pressure = self.change_pressure - value_pressure
-                    self.value_change_pressure.emit(self.change_pressure)
+                time.sleep(1)
 
                 elapsed_time = time.time() - time_initial
 
                 if current_enable_time_check:
                     if elapsed_time >= self.time_duration:
-                        self.finished_signal.emit(elapsed_time)
+                        elapsed_time = round(elapsed_time, 4)
+                        self.finished_data_signal.emit(elapsed_time)
                         break
 
     def update_num_chk(self, new_num_chk):
@@ -111,7 +138,8 @@ class ConnectionManager:
         self.ui_manager = ui_manager
         self.connection = ConnectionUtils()
         self.conn_bomb = None
-        self.thread = None
+        self.data_thread = None
+        self.reader_thread = None
         self.state_led_data = True
 
     def load_port(self):
@@ -120,20 +148,22 @@ class ConnectionManager:
     def check_port(self):
         self.connection.check_port(self.main_window.cbx_conn)
 
-    def connect_bomb(self):
+    def connect_device(self):
         if not self.conn_bomb:
             self.conn_bomb = self.connection.connection_bomb_util(self.main_window.cbx_conn)
-            comunication = ComunicationPressure(self.conn_bomb)
-            value_pressure = comunication.get_pressure()
-            #self.set_value_pressure(value_pressure)
+        else:
+            QtWidgets.QMessageBox.information(None, "Informacion", "Ya existe una conexion")
 
+    def start_device(self):
+        if self.conn_bomb:
+            self.main_window.tbl_data.setRowCount(0)
             num_chk = int(self.main_window.inp_sync.text())
             
             time_duration = float(self.main_window.inp_time_duration.text().replace(',', '.'))
 
             self.ged_data_pressure(num_chk, time_duration)
         else:
-            QtWidgets.QMessageBox.information(None, "Informacion", "Ya existe una conexion")
+            QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
     def color_led_data(self):
         self.main_window.led_data_save.setStyleSheet("background-color: green;" if self.state_led_data else "background-color: red;")
@@ -144,29 +174,34 @@ class ConnectionManager:
 
         enable_time_check = self.main_window.time_enable
 
-        self.thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
+        #self.thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
 
-        self.thread.pressure_value_signal.connect(self.set_value_pressure)
-        self.thread.pressure_value_signal.connect(self.set_value_saj)
-        self.thread.value_change_pressure.connect(self.set_change_pressure)
-        self.thread.caj_value_signal.connect(self.set_value_caj)
-        self.thread.data_ready.connect(self.set_table_item)
-        self.thread.finished_signal.connect(self.show_finished_message)
+        self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
+        self.reader_thread = PressureReaderThread(ComunicationPressure(self.conn_bomb))
 
-        self.thread.start()
+        self.reader_thread.pressure_value_reader_signal.connect(self.set_value_pressure)
+        self.reader_thread.pressure_value_reader_signal.connect(self.set_value_saj)
+
+        self.reader_thread.value_change_reader_pressure.connect(self.set_change_pressure)
+        self.reader_thread.caj_value_reader_signal.connect(self.set_value_caj)
+        self.data_thread.data_ready.connect(self.set_table_item)
+        self.data_thread.finished_data_signal.connect(self.show_finished_message)
+
+        self.data_thread.start()
+        self.reader_thread.start()
 
     def change_num_chk(self):
         num_chk = int(self.main_window.inp_sync.text())
-        if self.thread and self.thread.isRunning():
+        if self.data_thread and self.data_thread.isRunning():
             self.state_led_data = True
-            self.thread.resume_saving()
-            self.thread.update_num_chk(num_chk)
+            self.data_thread.resume_saving()
+            self.data_thread.update_num_chk(num_chk)
         else:
             print("El hilo no está corriendo.")
         self.color_led_data()
 
     def stop_data_saving(self):
-        self.thread.pause_saving()
+        self.data_thread.pause_saving()
         self.state_led_data = False
         self.color_led_data()
 
@@ -204,10 +239,55 @@ class ConnectionManager:
     def set_point(self):
         num_point = self.main_window.inp_set_point.text()
         if self.conn_bomb:
-            comunication = ComunicationSerial(self.conn_bomb)
-            comunication.set_point_example(num_point)
+            comunication = ComunicationPressure(self.conn_bomb)
+            comunication.get_device_out()
+
+            # channelIN = "Dev1/ai0"
+            # analog_input = AnalogInput(channelIN)
+            #analog_input.start()
+            
+            # Leer datos
+            # data = analog_input.read()
+            # print(f"Datos leídos: {data}")
+            
+            # Detener la tarea
+            # analog_input.stop()
+            # analog_input.clear()
+
+            # escribir datos analogicos
+            channelOUT = "Dev1/ao0"
+            analog_output = AnalogOutput(channelOUT)
+            # data = np.array([1.1])
+            # analog_output.write(data)
+
+            # analog_output.stop()
+            # analog_output.clear()
+            
+            #escribir datos digitales 
+            
+            # digital_output = DigitalOutput("Dev1/port0/line0:1") 
+            # digital_output.write([1, 0])
+
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
+
+    def control_solenoid(self, state):
+        # Aquí 'state' será 1 para activar y 0 para desactivar
+        if self.conn_bomb:
+            # Configurar el canal digital que controlará el relé
+            digital_output = DigitalOutput("Dev1/port0/line0")  # Ajusta este canal a tu configuración de hardware
+
+            # Enviar el estado al relé: 1 = activado, 0 = desactivado
+            digital_output.write([state])
+
+            # Detener la tarea y limpiar
+            digital_output.stop()
+            digital_output.clear()
+
+            QtWidgets.QMessageBox.information(None, "Información", "La válvula solenoide ha sido " + ("activada" if state == 1 else "desactivada"))
+
+        else:
+            QtWidgets.QMessageBox.information(None, "Información", "Realice la conexión")
 
     def show_finished_message(self, elapsed_time):
         self.close_bomb()
@@ -216,10 +296,9 @@ class ConnectionManager:
         )
 
     def close_bomb(self):
-        if self.thread:
-            self.thread.stop()
-        self.stop_data_saving()
+        if self.data_thread:
+            self.data_thread.stop()
+        if self.reader_thread:
+            self.reader_thread.stop()
         self.conn_bomb = self.connection.close_connection()
-        QtWidgets.QMessageBox.information(
-            None, "Advertencia", f"Sistema detenido"
-        )
+        QtWidgets.QMessageBox.information(None, "Advertencia", "Sistema detenido")
