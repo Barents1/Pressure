@@ -22,22 +22,22 @@ class PressureReaderThread(QtCore.QThread):
         self.change_pressure = None
 
     def run(self):
-        comunication = ComunicationPressure(self.conn_bomb)
+        #comunication = ComunicationPressure(self.conn_bomb)
         while self.is_running:
             
-            value_pressure = comunication.get_pressure()
-            value_caj = comunication.get_patron_caj(value_pressure)
+            #value_pressure = comunication.get_pressure()
+            #value_caj = comunication.get_patron_caj(value_pressure)
 
-            self.pressure_value_reader_signal.emit(round(value_pressure, 6))
-            self.caj_value_reader_signal.emit(round(value_caj, 6))
+            #self.pressure_value_reader_signal.emit(round(value_pressure, 6))
+            #self.caj_value_reader_signal.emit(round(value_caj, 6))
 
-            if self.change_pressure is None:
-                self.change_pressure = value_pressure
-            else:
-                difference = value_pressure - self.change_pressure
-                difference = round(difference, 6)
-                self.value_change_reader_pressure.emit(difference)
-                self.change_pressure = value_pressure
+            #if self.change_pressure is None:
+                #self.change_pressure = value_pressure
+            #else:
+                #difference = value_pressure - self.change_pressure
+                #difference = round(difference, 6)
+                #self.value_change_reader_pressure.emit(difference)
+                #self.change_pressure = value_pressure
 
             time.sleep(2)
 
@@ -240,7 +240,7 @@ class ConnectionManager:
         num_point = self.main_window.inp_set_point.text()
         if self.conn_bomb:
             comunication = ComunicationPressure(self.conn_bomb)
-            comunication.get_device_out()
+            comunication.get_port_device()
 
             # channelIN = "Dev1/ai0"
             # analog_input = AnalogInput(channelIN)

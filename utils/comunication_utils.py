@@ -35,16 +35,16 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             
-            #self.conn_bomb.write(msg.encode('ascii'))
+            self.conn_bomb.write(msg.encode('ascii'))
             time.sleep(0.1)
-            #request = self.conn_bomb.readline(10).decode('ascii').strip()
+            request = self.conn_bomb.readline(10).decode('ascii').strip()
             
-            request = self.value_pressure()
-            num_1 = request
+            #request = self.value_pressure()
+            #num_1 = request
             
-            #numbers = re.findall(r'-?\d+\.\d+', request)
+            numbers = re.findall(r'-?\d+\.\d+', request)
 
-            #num_1 = float(numbers[0])
+            num_1 = float(numbers[0])
             #num_2 = float(numbers[1])
             #num_3 = float(numbers[2])
 
@@ -85,9 +85,13 @@ class ComunicationPressure:
     def get_time(self):
         current_time = datetime.now().strftime('%H:%M:%S')
         return current_time
-    
-    def get_device_out(self):
+
+    def get_port_device(self):
         for device in self.system.devices:
             print(f"Dispositivo: {device.name}")
-            print(f"Canales de entrada analógica: {device.ai_physical_chans}")
-            print(f"Canales de salida analógica: {device.ao_physical_chans}")
+
+            print(f"Entrada analógica: {device.ai_physical_chans}")
+            print(f"Salida analógica: {device.ao_physical_chans}")
+
+            print(f"Entrada digital: {device.di_physical_chans}")
+            print(f"Salida digital: {device.do_physical_chans}")
