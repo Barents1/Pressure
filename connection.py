@@ -271,6 +271,24 @@ class ConnectionManager:
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
+    def control_solenoid(self, state):
+        # Aquí 'state' será 1 para activar y 0 para desactivar
+        if self.conn_bomb:
+            # Configurar el canal digital que controlará el relé
+            digital_output = DigitalOutput("Dev1/port0/line0")  # Ajusta este canal a tu configuración de hardware
+
+            # Enviar el estado al relé: 1 = activado, 0 = desactivado
+            digital_output.write([state])
+
+            # Detener la tarea y limpiar
+            digital_output.stop()
+            digital_output.clear()
+
+            QtWidgets.QMessageBox.information(None, "Información", "La válvula solenoide ha sido " + ("activada" if state == 1 else "desactivada"))
+
+        else:
+            QtWidgets.QMessageBox.information(None, "Información", "Realice la conexión")
+
     def show_finished_message(self, elapsed_time):
         self.close_bomb()
         QtWidgets.QMessageBox.information(
