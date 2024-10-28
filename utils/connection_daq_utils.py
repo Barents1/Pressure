@@ -3,8 +3,7 @@ from PyDAQmx import Task
 from PyDAQmx.DAQmxFunctions import DAQmxReadAnalogF64
 from PyDAQmx.DAQmxConstants import DAQmx_Val_GroupByChannel
 from PyDAQmx.DAQmxTypes import int32
-import nidaqmx
-from nidaqmx.constants import LineGrouping
+
 from PyDAQmx.DAQmxFunctions import DAQmxWriteDigitalLines
 from PyDAQmx.DAQmxFunctions import DAQmxWriteAnalogF64
 
@@ -27,11 +26,17 @@ class AnalogInput(Task):
 class AnalogOutput(Task):
     def __init__(self, channel):
         super().__init__()
-        #establecer el limite de los rangos
+        #establecer el limite de los rangos 0 - 5V
         self.CreateAOVoltageChan(channel, "", 0.0, 5.0, DAQmx_Val_GroupByChannel, None)
-    
+
     def write(self, data):
         DAQmxWriteAnalogF64(self, len(data), False, 10.0, DAQmx_Val_GroupByChannel, data, None, None)
+
+    def on_bomb(self):
+        self.write(np.array([4.0]))  # Activa el relé enviando 5V
+
+    def off_bomb(self):
+        self.write(np.array([0.0]))  # Desactiva el relé enviando 0V
 
 class DigitalOutput(Task):
     def __init__(self, channels):
@@ -44,11 +49,3 @@ class DigitalOutput(Task):
         data = np.array(values, dtype=np.uint8)
         written = int32()
         DAQmxWriteDigitalLines(self, len(data), 1, 10.0, DAQmx_Val_GroupByChannel, data, written, None)
-
-    def set_multiple_digital_outputs(self):
-        with nidaqmx.Task() as task:
-            # Definir múltiples líneas digitales: port0/line0 hasta port0/line7
-            task.do_channels.add_do_chan("Dev1/port0/line0:7", line_grouping=LineGrouping.CHAN_FOR_ALL_LINES)
-
-            # Escribir un array de valores digitales (1 = HIGH, 0 = LOW)
-            task.write([1, 0, 1, 0, 1, 0, 1, 0])

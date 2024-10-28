@@ -25,19 +25,19 @@ class PressureReaderThread(QtCore.QThread):
         #comunication = ComunicationPressure(self.conn_bomb)
         while self.is_running:
             
-            #value_pressure = comunication.get_pressure()
-            #value_caj = comunication.get_patron_caj(value_pressure)
+            # value_pressure = comunication.get_pressure()
+            # value_caj = comunication.get_patron_caj(value_pressure)
 
-            #self.pressure_value_reader_signal.emit(round(value_pressure, 6))
-            #self.caj_value_reader_signal.emit(round(value_caj, 6))
+            # self.pressure_value_reader_signal.emit(round(value_pressure, 6))
+            # self.caj_value_reader_signal.emit(round(value_caj, 6))
 
-            #if self.change_pressure is None:
-                #self.change_pressure = value_pressure
-            #else:
-                #difference = value_pressure - self.change_pressure
-                #difference = round(difference, 6)
-                #self.value_change_reader_pressure.emit(difference)
-                #self.change_pressure = value_pressure
+            # if self.change_pressure is None:
+            #     self.change_pressure = value_pressure
+            # else:
+            #     difference = value_pressure - self.change_pressure
+            #     difference = round(difference, 6)
+            #     self.value_change_reader_pressure.emit(difference)
+            #     self.change_pressure = value_pressure
 
             time.sleep(2)
 
@@ -240,29 +240,53 @@ class ConnectionManager:
         num_point = self.main_window.inp_set_point.text()
         if self.conn_bomb:
             comunication = ComunicationPressure(self.conn_bomb)
-            comunication.get_port_device()
+            comunication.get_device_out()
 
-            # channelIN = "Dev1/ai0"
-            # analog_input = AnalogInput(channelIN)
+            #channelIN = "Dev1/ai0"
+            #analog_input = AnalogInput(channelIN)
             #analog_input.start()
-            
             # Leer datos
-            # data = analog_input.read()
-            # print(f"Datos leídos: {data}")
-            
+            #data = analog_input.read()
+            #print(f"Datos leídos: {data}")
             # Detener la tarea
-            # analog_input.stop()
-            # analog_input.clear()
-
+            #analog_input.stop()
+            #analog_input.clear()
+            channels = [f"Dev1/ai{i}" for i in range(16)]
+            channel_data = {channel: [] for channel in channels}
+            start_time = time.time()
+            while time.time() - start_time < 10:  # Loop durante 10 segundos
+                for channel in channels:
+                    analog_input = AnalogInput(channel)
+                    analog_input.start()
+                    
+                    data = analog_input.read()
+                    channel_data[channel].append(data)
+                    
+                    analog_input.stop()
+                    analog_input.clear()
+                    
+                time.sleep(0.1) 
+            
+            for channel, data_list in channel_data.items():
+                print(f"Datos leídos en {channel}: {data_list}")
+            
             # escribir datos analogicos
+            
             channelOUT = "Dev1/ao0"
             analog_output = AnalogOutput(channelOUT)
-            # data = np.array([1.1])
-            # analog_output.write(data)
-
-            # analog_output.stop()
-            # analog_output.clear()
+            analog_output.on_bomb()
+            time.sleep(4)
+            analog_output.off_bomb()
+            analog_output.stop()
+            analog_output.clear()
             
+            """
+            data = np.array([1.1])
+            analog_output.write(data)
+
+            analog_output.stop()
+            analog_output.clear()
+            """
             #escribir datos digitales 
             
             # digital_output = DigitalOutput("Dev1/port0/line0:1") 

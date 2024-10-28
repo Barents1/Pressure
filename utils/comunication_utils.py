@@ -85,13 +85,9 @@ class ComunicationPressure:
     def get_time(self):
         current_time = datetime.now().strftime('%H:%M:%S')
         return current_time
-
-    def get_port_device(self):
+    
+    def get_device_out(self):
         for device in self.system.devices:
             print(f"Dispositivo: {device.name}")
-
-            print(f"Entrada analógica: {device.ai_physical_chans}")
-            print(f"Salida analógica: {device.ao_physical_chans}")
-
-            print(f"Entrada digital: {device.di_physical_chans}")
-            print(f"Salida digital: {device.do_physical_chans}")
+            print(f"Canales de entrada analógica: {device.ai_physical_chans}")
+            print(f"Canales de salida analógica: {device.ao_physical_chans}")

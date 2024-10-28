@@ -8,6 +8,9 @@ python.exe -m pip install --upgrade pip
 pip install PyDAQmx
 pip install nidaqmx
 
+# Entorno Virtual
+# instalar
+pip install virtualenv
 #   crear
 python -m venv venv
 #   activar
