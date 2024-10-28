@@ -251,22 +251,23 @@ class ConnectionManager:
             # Detener la tarea
             #analog_input.stop()
             #analog_input.clear()
-            channels = [f"Dev1/ai{i}" for i in range(16)]
+            channels = [f"Dev1/ai{i}" for i in range(0, 4)]
             channel_data = {channel: [] for channel in channels}
             start_time = time.time()
+
             while time.time() - start_time < 10:  # Loop durante 10 segundos
                 for channel in channels:
                     analog_input = AnalogInput(channel)
                     analog_input.start()
-                    
+
                     data = analog_input.read()
                     channel_data[channel].append(data)
-                    
+
                     analog_input.stop()
                     analog_input.clear()
-                    
-                time.sleep(0.1) 
-            
+
+                time.sleep(0.1)
+
             for channel, data_list in channel_data.items():
                 print(f"Datos leídos en {channel}: {data_list}")
             
