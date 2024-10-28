@@ -273,13 +273,13 @@ class ConnectionManager:
             
             # escribir datos analogicos
             
-            channelOUT = "Dev1/ao0"
-            analog_output = AnalogOutput(channelOUT)
-            analog_output.on_bomb()
-            time.sleep(4)
-            analog_output.off_bomb()
-            analog_output.stop()
-            analog_output.clear()
+            #channelOUT = "Dev1/ao0"
+            #analog_output = AnalogOutput(channelOUT)
+            #analog_output.on_bomb()
+            #time.sleep(4)
+            #analog_output.off_bomb()
+            #analog_output.stop()
+            #analog_output.clear()
             
             """
             data = np.array([1.1])
