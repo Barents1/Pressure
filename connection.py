@@ -1,9 +1,9 @@
 from PyQt5 import QtWidgets, QtCore
 from utils.connection_utils import ConnectionUtils
 from utils.comunication_utils import ComunicationPressure
-from utils.connection_daq_utils import AnalogInput
-from utils.connection_daq_utils import AnalogOutput
-from utils.connection_daq_utils import DigitalOutput
+from utils.control_utils import ControlDevice
+# from utils.connection_daq_utils import AnalogOutput
+# from utils.connection_daq_utils import DigitalOutput
 import time
 import numpy as np
 import os
@@ -137,6 +137,7 @@ class ConnectionManager:
         self.main_window = main_window
         self.ui_manager = ui_manager
         self.connection = ConnectionUtils()
+        self.control = ControlDevice()
         self.conn_bomb = None
         self.data_thread = None
         self.reader_thread = None
@@ -177,7 +178,7 @@ class ConnectionManager:
         #self.thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
 
         self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
-        self.reader_thread = PressureReaderThread(ComunicationPressure(self.conn_bomb))
+        self.reader_thread = PressureReaderThread(self.conn_bomb)
 
         self.reader_thread.pressure_value_reader_signal.connect(self.set_value_pressure)
         self.reader_thread.pressure_value_reader_signal.connect(self.set_value_saj)
@@ -237,55 +238,27 @@ class ConnectionManager:
             self.main_window.inp_change_pressure.setText(value_change)
 
     def set_point(self):
-        num_point = self.main_window.inp_set_point.text()
+        num_point = int(self.main_window.inp_set_point.text())
         if self.conn_bomb:
             comunication = ComunicationPressure(self.conn_bomb)
-            comunication.get_device_out()
-
-            # channelIN = "Dev1/ai0"
-            # analog_input = AnalogInput(channelIN)
-            #analog_input.start()
-            
-            # Leer datos
-            # data = analog_input.read()
-            # print(f"Datos leídos: {data}")
-            
-            # Detener la tarea
-            # analog_input.stop()
-            # analog_input.clear()
-
-            # escribir datos analogicos
-            channelOUT = "Dev1/ao0"
-            analog_output = AnalogOutput(channelOUT)
-            # data = np.array([1.1])
-            # analog_output.write(data)
-
-            # analog_output.stop()
-            # analog_output.clear()
-            
-            #escribir datos digitales 
-            
-            # digital_output = DigitalOutput("Dev1/port0/line0:1") 
-            # digital_output.write([1, 0])
-
+            patron_saj = comunication.get_pressure()
+            if num_point > patron_saj:
+                #Falta PID
+                self.control.up_pressure(2.0)  # Enviar 2V de señal analógica
+                print("subir presion")
+            elif num_point < patron_saj:
+                #Falta PID
+                self.control.down_pressure()
+                print("bajar presion")
+            else:
+                print("Valor similar")
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
-    def control_solenoid(self, state):
-        # Aquí 'state' será 1 para activar y 0 para desactivar
+    def stop_device(self):
         if self.conn_bomb:
-            # Configurar el canal digital que controlará el relé
-            digital_output = DigitalOutput("Dev1/port0/line0")  # Ajusta este canal a tu configuración de hardware
-
-            # Enviar el estado al relé: 1 = activado, 0 = desactivado
-            digital_output.write([state])
-
-            # Detener la tarea y limpiar
-            digital_output.stop()
-            digital_output.clear()
-
-            QtWidgets.QMessageBox.information(None, "Información", "La válvula solenoide ha sido " + ("activada" if state == 1 else "desactivada"))
-
+            self.control.stop_all_tasks()
+            print("detenido")
         else:
             QtWidgets.QMessageBox.information(None, "Información", "Realice la conexión")
 

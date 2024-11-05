@@ -26,7 +26,7 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
         self.btn_save_rute.clicked.connect(self.ui_manager.save_rute)
         self.btn_connect.clicked.connect(self.connection.connect_device)
         self.btn_start.clicked.connect(self.connection.start_device)
-        self.btn_stop_conn.clicked.connect(self.connection.close_bomb)
+        #self.btn_stop_conn.clicked.connect(self.connection.close_bomb)
         self.btn_start_conn.clicked.connect(self.connection.set_point)
         self.btn_enable.clicked.connect(self.ui_manager.toggle_button_state)
         self.btn_time_duration.clicked.connect(self.ui_manager.toggle_button_time_state) 
@@ -34,6 +34,7 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
         self.btn_finish_system.clicked.connect(self.connection.close_bomb)
         self.btn_save_ctrl_data.clicked.connect(self.connection.change_num_chk)
         self.btn_stop_ctrl_data.clicked.connect(self.connection.stop_data_saving)
+        self.btn_stop_conn.clicked.connect(self.connection.stop_device)
 
     def enable_button(self):
         self.inp_a0.setEnabled(True)
