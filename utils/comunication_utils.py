@@ -3,8 +3,6 @@ from datetime import datetime
 import time
 from PyQt5 import QtWidgets
 import re
-import nidaqmx
-from nidaqmx.system import System
 
 class ComunicationPressure:
     def __init__(self, conn_bomb):
@@ -14,7 +12,7 @@ class ComunicationPressure:
         self.pa_a0 = -0.179608
         self.pa_a1 = 1.0000782
         self.data_test = 729.011
-        self.system = System.local()
+
     """
     def value_pressure(self):
         #num = "R,729.011"
@@ -35,16 +33,16 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             
-            self.conn_bomb.write(msg.encode('ascii'))
+            #self.conn_bomb.write(msg.encode('ascii'))
             time.sleep(0.1)
-            request = self.conn_bomb.readline(10).decode('ascii').strip()
+            #request = self.conn_bomb.readline(10).decode('ascii').strip()
             
-            #request = self.value_pressure()
-            #num_1 = request
+            request = self.value_pressure()
+            num_1 = request
             
-            numbers = re.findall(r'-?\d+\.\d+', request)
+            #numbers = re.findall(r'-?\d+\.\d+', request)
 
-            num_1 = float(numbers[0])
+            #num_1 = float(numbers[0])
             #num_2 = float(numbers[1])
             #num_3 = float(numbers[2])
 
@@ -66,12 +64,6 @@ class ComunicationPressure:
             print(f"Error al enviar la instruccion: {e}")
             return 0
 
-    def set_point(self, number):
-        print(f"numero: {number}")
-        msg = f"PSN {number} KPA\r\n"
-        print(msg)
-        self.conn_bomb.write(msg.encode('ascii'))
-
     def get_patron_caj(self, pressure_value):
         # Formula pressure_caj
         pressure_caj = (pressure_value * self.pa_a1) + self.pa_a0
@@ -86,8 +78,3 @@ class ComunicationPressure:
         current_time = datetime.now().strftime('%H:%M:%S')
         return current_time
     
-    def get_device_out(self):
-        for device in self.system.devices:
-            print(f"Dispositivo: {device.name}")
-            print(f"Canales de entrada analógica: {device.ai_physical_chans}")
-            print(f"Canales de salida analógica: {device.ao_physical_chans}")

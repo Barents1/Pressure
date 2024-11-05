@@ -1,9 +1,9 @@
 from PyQt5 import QtWidgets, QtCore
 from utils.connection_utils import ConnectionUtils
 from utils.comunication_utils import ComunicationPressure
-from utils.connection_daq_utils import AnalogInput
-from utils.connection_daq_utils import AnalogOutput
-from utils.connection_daq_utils import DigitalOutput
+from utils.control_utils import ControlDevice
+# from utils.connection_daq_utils import AnalogOutput
+# from utils.connection_daq_utils import DigitalOutput
 import time
 import numpy as np
 import os
@@ -22,22 +22,22 @@ class PressureReaderThread(QtCore.QThread):
         self.change_pressure = None
 
     def run(self):
-        #comunication = ComunicationPressure(self.conn_bomb)
+        comunication = ComunicationPressure(self.conn_bomb)
         while self.is_running:
             
-            # value_pressure = comunication.get_pressure()
-            # value_caj = comunication.get_patron_caj(value_pressure)
+            value_pressure = comunication.get_pressure()
+            value_caj = comunication.get_patron_caj(value_pressure)
 
-            # self.pressure_value_reader_signal.emit(round(value_pressure, 6))
-            # self.caj_value_reader_signal.emit(round(value_caj, 6))
+            self.pressure_value_reader_signal.emit(round(value_pressure, 6))
+            self.caj_value_reader_signal.emit(round(value_caj, 6))
 
-            # if self.change_pressure is None:
-            #     self.change_pressure = value_pressure
-            # else:
-            #     difference = value_pressure - self.change_pressure
-            #     difference = round(difference, 6)
-            #     self.value_change_reader_pressure.emit(difference)
-            #     self.change_pressure = value_pressure
+            if self.change_pressure is None:
+                self.change_pressure = value_pressure
+            else:
+                difference = value_pressure - self.change_pressure
+                difference = round(difference, 6)
+                self.value_change_reader_pressure.emit(difference)
+                self.change_pressure = value_pressure
 
             time.sleep(2)
 
@@ -137,6 +137,7 @@ class ConnectionManager:
         self.main_window = main_window
         self.ui_manager = ui_manager
         self.connection = ConnectionUtils()
+        self.control = ControlDevice()
         self.conn_bomb = None
         self.data_thread = None
         self.reader_thread = None
@@ -177,7 +178,7 @@ class ConnectionManager:
         #self.thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
 
         self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
-        self.reader_thread = PressureReaderThread(ComunicationPressure(self.conn_bomb))
+        self.reader_thread = PressureReaderThread(self.conn_bomb)
 
         self.reader_thread.pressure_value_reader_signal.connect(self.set_value_pressure)
         self.reader_thread.pressure_value_reader_signal.connect(self.set_value_saj)
@@ -237,80 +238,27 @@ class ConnectionManager:
             self.main_window.inp_change_pressure.setText(value_change)
 
     def set_point(self):
-        num_point = self.main_window.inp_set_point.text()
+        num_point = int(self.main_window.inp_set_point.text())
         if self.conn_bomb:
             comunication = ComunicationPressure(self.conn_bomb)
-            comunication.get_device_out()
-
-            #channelIN = "Dev1/ai0"
-            #analog_input = AnalogInput(channelIN)
-            #analog_input.start()
-            # Leer datos
-            #data = analog_input.read()
-            #print(f"Datos leídos: {data}")
-            # Detener la tarea
-            #analog_input.stop()
-            #analog_input.clear()
-            channels = [f"Dev1/ai{i}" for i in range(0, 4)]
-            channel_data = {channel: [] for channel in channels}
-            start_time = time.time()
-
-            while time.time() - start_time < 10:  # Loop durante 10 segundos
-                for channel in channels:
-                    analog_input = AnalogInput(channel)
-                    analog_input.start()
-
-                    data = analog_input.read()
-                    channel_data[channel].append(data)
-
-                    analog_input.stop()
-                    analog_input.clear()
-
-                time.sleep(0.1)
-
-            for channel, data_list in channel_data.items():
-                print(f"Datos leídos en {channel}: {data_list}")
-            
-            # escribir datos analogicos
-            
-            #channelOUT = "Dev1/ao0"
-            #analog_output = AnalogOutput(channelOUT)
-            #analog_output.on_bomb()
-            #time.sleep(4)
-            #analog_output.off_bomb()
-            #analog_output.stop()
-            #analog_output.clear()
-            
-            """
-            data = np.array([1.1])
-            analog_output.write(data)
-
-            analog_output.stop()
-            analog_output.clear()
-            """
-            #escribir datos digitales 
-            
-            # digital_output = DigitalOutput("Dev1/port0/line0:1") 
-            # digital_output.write([1, 0])
-
+            patron_saj = comunication.get_pressure()
+            if num_point > patron_saj:
+                #Falta PID
+                self.control.up_pressure(2.0)  # Enviar 2V de señal analógica
+                print("subir presion")
+            elif num_point < patron_saj:
+                #Falta PID
+                self.control.down_pressure()
+                print("bajar presion")
+            else:
+                print("Valor similar")
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
-    def control_solenoid(self, state):
-        # Aquí 'state' será 1 para activar y 0 para desactivar
+    def stop_device(self):
         if self.conn_bomb:
-            # Configurar el canal digital que controlará el relé
-            digital_output = DigitalOutput("Dev1/port0/line0")  # Ajusta este canal a tu configuración de hardware
-
-            # Enviar el estado al relé: 1 = activado, 0 = desactivado
-            digital_output.write([state])
-
-            # Detener la tarea y limpiar
-            digital_output.stop()
-            digital_output.clear()
-
-            QtWidgets.QMessageBox.information(None, "Información", "La válvula solenoide ha sido " + ("activada" if state == 1 else "desactivada"))
-
+            self.control.stop_all_tasks()
+            print("detenido")
         else:
             QtWidgets.QMessageBox.information(None, "Información", "Realice la conexión")
 

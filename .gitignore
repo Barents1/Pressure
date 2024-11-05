@@ -1,4 +1,0 @@
-# Ignorar las configuraciones de IDEs
-.idea/
-.vscode/
-__pycache__/
