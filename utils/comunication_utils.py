@@ -11,7 +11,8 @@ class ComunicationPressure:
         self.patron_saj = None
         self.pa_a0 = -0.179608
         self.pa_a1 = 1.0000782
-        self.data_test = 729.011
+        self.data_test = 735.011
+        self.direction = 1  # 1 para subir, -1 para bajar
 
     """
     def value_pressure(self):
@@ -20,9 +21,13 @@ class ComunicationPressure:
         return num
     """
     def value_pressure(self):
-        num = self.data_test + 1.011
-        self.data_test = num
-        return num
+        if self.direction == 1 and self.data_test >= 950:
+            self.direction = -1
+        elif self.direction == -1 and self.data_test <= 875:
+            self.direction = 1
+
+        self.data_test += self.direction * 10.011
+        return self.data_test
     
     def get_pressure(self):
         if self.conn_bomb is None:
@@ -33,20 +38,19 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             
-            #self.conn_bomb.write(msg.encode('ascii'))
+            self.conn_bomb.write(msg.encode('ascii'))
             time.sleep(0.1)
-            #request = self.conn_bomb.readline(10).decode('ascii').strip()
+            request = self.conn_bomb.readline(50).decode('ascii').strip()
             
-            request = self.value_pressure()
-            num_1 = request
+            #request = self.value_pressure()
+            #num_1 = request
             
-            #numbers = re.findall(r'-?\d+\.\d+', request)
+            numbers = re.findall(r'-?\d+\.\d+', request)
 
-            #num_1 = float(numbers[0])
+            num_1 = float(numbers[0])
             #num_2 = float(numbers[1])
             #num_3 = float(numbers[2])
-
-            print(f"Respuesta del dispositivo: {num_1}")
+            #print(f"Respuesta del dispositivo: {num_1}")
             return num_1
         
             #if len(numbers) >= 3:
@@ -65,10 +69,9 @@ class ComunicationPressure:
             return 0
 
     def get_patron_caj(self, pressure_value):
-        # Formula pressure_caj
-        pressure_caj = (pressure_value * self.pa_a1) + self.pa_a0
-        #print(f"Calculado pressure_caj: ({pressure_value} * {self.pa_a1}) + {self.pa_a0} = {pressure_caj}")
-        return pressure_caj
+        if pressure_value is None:
+            pressure_value = 0  # o cualquier valor predeterminado
+        return (pressure_value * self.pa_a1) + self.pa_a0
 
     def get_date(self):
         current_date = datetime.now().strftime('%d/%m/%Y')

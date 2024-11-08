@@ -20,6 +20,7 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
         self.initialize_actions()
         self.disable_button()
         self.time_enable = True
+        self.inp_time_remaining.setText(f"{0:.0f}")
 
     def initialize_actions(self):
         self.cbx_conn.activated.connect(self.connection.check_port)
@@ -27,7 +28,7 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
         self.btn_connect.clicked.connect(self.connection.connect_device)
         self.btn_start.clicked.connect(self.connection.start_device)
         #self.btn_stop_conn.clicked.connect(self.connection.close_bomb)
-        self.btn_start_conn.clicked.connect(self.connection.set_point)
+        self.btn_start_conn.clicked.connect(self.connection.active_set_point)
         self.btn_enable.clicked.connect(self.ui_manager.toggle_button_state)
         self.btn_time_duration.clicked.connect(self.ui_manager.toggle_button_time_state) 
         self.btn_reset.clicked.connect(self.reset_value)    
