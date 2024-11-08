@@ -25,14 +25,13 @@ class AnalogOutput(Task):
             print("Error: El voltaje debe estar entre 0 y 5V")
 
     def off_bomb(self):
-        if not self.task_running:
-            DAQmxStartTask(self.taskHandle)
-            self.task_running = True
-        self.write([0.0])
         if self.task_running:
-            DAQmxStopTask(self.taskHandle)
+            self.write([0.0])  # Apagar la salida analógica
+            DAQmxStopTask(self.taskHandle)  # Detener la tarea solo si estaba en ejecución
             self.task_running = False
-        print("Señal analógica desactivada")
+            print("Señal analógica desactivada")
+        else:
+            print("La tarea ya está detenida o no fue iniciada")
 
     def stop_task(self):
         if self.task_running:
@@ -52,15 +51,12 @@ class DigitalOutput(Task):
 
     def activate_valve(self):
         self.write(0b0001)  # Activa la válvula en p0.0
-        print("Válvula de sellado activada")
 
     def activate_motor(self):
         self.write(0b1000)  # Activa el motor en p0.3
-        print("Motor activado")
 
     def activate_both(self):
         self.write(0b1001)
-        print("Válvula y motor activados")
 
     def deactivate_all(self):
         self.write(0b0000)
@@ -77,16 +73,57 @@ class ControlDevice:
         self.analog_output = AnalogOutput(analog_channel)
         self.digital_output = DigitalOutput(digital_channel)
 
-    def up_pressure(self, voltage):
+    def active_valvule(self):
         self.digital_output.activate_both()
+        print("Puertos digitales activados")
+
+    def up_pressure(self, voltage):
         self.analog_output.on_bomb(voltage)
 
-    def down_pressure(self):
-        self.digital_output.activate_both()
-        self.analog_output.off_bomb() 
+    def down_pressure(self):       
+        self.analog_output.off_bomb()
 
     def stop_all_tasks(self):
         self.analog_output.off_bomb()
         self.digital_output.deactivate_all()
         self.analog_output.stop_task()
         self.digital_output.stop_task()
+
+class PIDController:
+    def __init__(self, dt, min_output=-100, max_output=100):
+        self.Kp = 0.054236
+        self.Ki = 0.0010894
+        self.Kd = 0.25123
+        self.dt = dt
+        self.min_output = min_output
+        self.max_output = max_output
+        self.prev_error = 0
+        self.integral = 0
+
+    def calculate(self, setpoint, pressure_measured):
+        error = setpoint - pressure_measured
+
+        # Término Proporcional
+        P = self.Kp * error
+
+        # Término Integral con integración trapezoidal
+        self.integral += (error + self.prev_error) / 2 * self.dt
+        I = self.Ki * self.integral
+
+        # Término Derivativo
+        D = self.Kd * (error - self.prev_error) / self.dt
+
+        # Salida del controlador PID sin ajustar
+        output = P + I + D
+
+        # Limitar el valor del output al rango especificado (por ejemplo, -100 a 100)
+        output = max(self.min_output, min(self.max_output, output))
+
+        # Escalar el output de -100 a 100 al rango de 0 a 5V
+        if error <= 0.5:
+            output_ajustado = 0 
+        else:
+            output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
+
+        self.prev_error = error
+        return output_ajustado, error

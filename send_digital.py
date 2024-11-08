@@ -69,26 +69,26 @@ class Control:
 
     def up_pressure(self, voltage):
         self.digital_output.activate_both()
-        self.analog_output.on_bomb(voltage)
+        #self.analog_output.on_bomb(voltage)
 
     def down_pressure(self):
         self.digital_output.activate_both()
-        self.analog_output.off_bomb() 
+        #self.analog_output.off_bomb() 
 
     def stop_all_tasks(self):
-        self.analog_output.off_bomb()
+        #self.analog_output.off_bomb()
         self.digital_output.deactivate_all()
         self.analog_output.stop_task()
         self.digital_output.stop_task()
 
-# if __name__ == "__main__":
-#     import time
-#     control = Control()
+if __name__ == "__main__":
+    import time
+    control = Control()
 
-#     # Prueba de las funciones de control
-#     control.up_pressure(2.0)  # Enviar 2V de señal analógica
-#     time.sleep(10)
-
-#     control.down_pressure()  # Activar válvula y motor
-#     time.sleep(5)
-#     control.stop_all_tasks() 
+    # Prueba de las funciones de control
+    control.up_pressure(2.0)  # Enviar 2V de señal analógica
+    time.sleep(10)
+    #control.down_pressure()  # Activar válvula y motor
+    #time.sleep(5)
+    control.stop_all_tasks() 
+    time.sleep(15)
