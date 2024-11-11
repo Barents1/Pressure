@@ -14,6 +14,7 @@ class PressureReaderThread(QtCore.QThread):
     caj_value_reader_signal = QtCore.pyqtSignal(float)
     value_change_reader_pressure = QtCore.pyqtSignal(float)
     pressure_updated_signal = QtCore.pyqtSignal(float)
+    set_point_error_signal = QtCore.pyqtSignal(float)
 
     def __init__(self, conn_bomb):
         super().__init__()
@@ -31,7 +32,7 @@ class PressureReaderThread(QtCore.QThread):
     def run(self):
         comunication = ComunicationPressure(self.conn_bomb)
         while self.is_running:
-            value_pressure = comunication.get_pressure()
+            value_pressure, error_dif = comunication.get_pressure()
             value_caj = comunication.get_patron_caj(value_pressure)
 
             # Actualiza el valor de la presión
@@ -41,10 +42,11 @@ class PressureReaderThread(QtCore.QThread):
             self.pressure_value_reader_signal.emit(round(value_pressure, 6))
             self.caj_value_reader_signal.emit(round(value_caj, 6))
 
-            self.emit_pressure_difference(value_pressure)
+            #self.emit_pressure_difference(value_pressure)
+            self.emit_pressure_difference(error_dif)
             self.process_set_point(value_pressure)
 
-            time.sleep(2)
+            time.sleep(1)
 
     def update_pressure_value(self, pressure_value):
         self.current_pressure_value = pressure_value
@@ -53,9 +55,10 @@ class PressureReaderThread(QtCore.QThread):
         if self.change_pressure is None:
             self.change_pressure = value_pressure
         else:
-            difference = round(value_pressure - self.change_pressure, 6)
-            self.value_change_reader_pressure.emit(difference)
-            self.change_pressure = value_pressure
+            #difference = round(value_pressure - self.change_pressure, 6)
+            #self.value_change_reader_pressure.emit(difference)
+            #self.change_pressure = value_pressure
+            self.value_change_reader_pressure.emit(value_pressure)
 
     def process_set_point(self, value_pressure):
         if self.state_set_point:
@@ -75,16 +78,8 @@ class PressureReaderThread(QtCore.QThread):
         print(f"Presión actual: {value_pressure}, Setpoint: {num_point}, Error: {error:.3f}")
 
         self.control.up_pressure(output)
+        self.set_point_error_signal.emit(error)
 
-        # if error > 0:
-        #     self.control.up_pressure(output)
-        #     print("Sube la presión")
-        # elif error < -1:
-        #     self.control.up_pressure([0.0])
-        #     print("Baja la presión")
-        # else:
-        #     print("Presión dentro del rango deseado")
-            
         result, acum = self.stabilization(error)
         print(f"estabilizador = {result} y acumulador = {acum}")
         if result == 1:
@@ -93,16 +88,20 @@ class PressureReaderThread(QtCore.QThread):
             self.change_state_set_point(False, num_point)
 
     def stabilization(self, error):
+        # Usar una ventana de promediado para reducir fluctuaciones
         if self.i == 0:
-            testing = 1
-        else:
-            testing = error
-
+            self.error_list = []  # Lista para acumular errores
+        self.error_list.append(error)
         self.i += 1
-        if -1 <= testing <= 0:
-            self.accumulator += 1
         
-        if self.accumulator >= 30:
+        # Evaluar estabilidad después de 5 lecturas (ajustable)
+        if len(self.error_list) >= 5:
+            avg_error = sum(self.error_list) / len(self.error_list)
+            if abs(avg_error) <= 0.5:  # Ajusta el umbral según tu necesidad
+                self.accumulator += 1
+            self.error_list.pop(0)  # Descartar la lectura más antigua
+        
+        if self.accumulator >= 4:  # Ajustar según los resultados
             result = 1
             self.i = 0
             self.accumulator = 0
@@ -270,7 +269,6 @@ class ConnectionManager:
 
         self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
         self.reader_thread = PressureReaderThread(self.conn_bomb)
-        # self.reader_thread = PressureReaderThread(self.conn_bomb, enable_set_point, set_point)
 
         self.reader_thread.pressure_updated_signal.connect(self.data_thread.update_pressure_value)
 
@@ -279,6 +277,9 @@ class ConnectionManager:
 
         self.reader_thread.value_change_reader_pressure.connect(self.set_change_pressure)
         self.reader_thread.caj_value_reader_signal.connect(self.set_value_caj)
+
+        self.reader_thread.set_point_error_signal.connect(self.set_value_error)
+
         self.data_thread.data_ready.connect(self.set_table_item)
         self.data_thread.time_remaining_signal.connect(self.update_remaining_time)
         self.data_thread.finished_data_signal.connect(self.show_finished_message)
@@ -311,6 +312,9 @@ class ConnectionManager:
             self.state_led_motor = True
             self.state_led_sealed = True
             self.color_led_device()
+            time.sleep(0.1)
+            state = self.control.check_port_digital()
+            print(f"estado valvula = {state}")
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Inicie el programa")
 
@@ -339,6 +343,11 @@ class ConnectionManager:
             self.main_window.inp_current_pressure.setValue(value_pressure)
             self.ui_manager.set_value_slide(value_pressure)
 
+    def set_value_error(self, error_value):
+        if self.conn_bomb:
+            error_value = str(round(error_value, 4))
+            self.main_window.inp_error_pressure.setText(error_value)
+
     def set_value_saj(self, num_pressure):
         value_pressure = str(num_pressure)
         if self.conn_bomb:
@@ -358,6 +367,8 @@ class ConnectionManager:
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
             self.control.stop_all_tasks()
+            state = self.control.check_port_digital()
+            print(f"estado valvula = {state}")
             self.reader_thread.change_state_set_point(False, num_point)
             self.state_led_motor = False
             self.state_led_sealed = False
@@ -377,6 +388,7 @@ class ConnectionManager:
             self.data_thread.stop()
         if self.reader_thread:
             self.reader_thread.stop()
+        self.stop_device()
         self.conn_bomb = self.connection.close_connection()
         self.state_led_data = False
         self.color_led_data()

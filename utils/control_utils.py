@@ -1,7 +1,8 @@
 import numpy as np
 from PyDAQmx import Task
 from PyDAQmx.DAQmxConstants import DAQmx_Val_Volts, DAQmx_Val_GroupByChannel, DAQmx_Val_ChanForAllLines
-from PyDAQmx.DAQmxFunctions import DAQmxWriteAnalogF64, DAQmxWriteDigitalU32, DAQmxStartTask, DAQmxStopTask
+from PyDAQmx.DAQmxFunctions import DAQmxWriteAnalogF64, DAQmxReadDigitalU32, DAQmxWriteDigitalU32, DAQmxStartTask, DAQmxStopTask
+import ctypes
 
 class AnalogOutput(Task):
     def __init__(self, analog_channel):
@@ -66,6 +67,21 @@ class DigitalOutput(Task):
         DAQmxStopTask(self.taskHandle)
         print("Tarea digital detenida")
 
+    def check_out_digital(self):
+        data = np.zeros(1, dtype=np.uint32)
+        samps_per_chan_read = ctypes.c_int32()  # Cambiado a un entero de ctypes
+        DAQmxReadDigitalU32(
+            self.taskHandle,
+            1,  # numSampsPerChan
+            10.0,  # timeout
+            DAQmx_Val_GroupByChannel,
+            data,
+            len(data),
+            ctypes.byref(samps_per_chan_read),  # Usamos byref para pasar un puntero
+            None  # reserved
+        )
+        return data[0] != 0
+
 class ControlDevice:
     def __init__(self):
         analog_channel = "Dev1/ao0"
@@ -89,8 +105,21 @@ class ControlDevice:
         self.analog_output.stop_task()
         self.digital_output.stop_task()
 
+    def check_port_digital(self):
+        if self.digital_output.check_out_digital():
+            print("Las salidas digitales están activas.")
+            return True
+        else:
+            print("Todas las salidas digitales están desactivadas.")
+            return False
+
+# Filtro media Movil
+"""
 class PIDController:
     def __init__(self, dt, min_output=-100, max_output=100):
+        # self.Kp = 0.1
+        # self.Ki = 0.002
+        # self.Kd = 0.05
         self.Kp = 0.054236
         self.Ki = 0.0010894
         self.Kd = 0.25123
@@ -99,6 +128,8 @@ class PIDController:
         self.max_output = max_output
         self.prev_error = 0
         self.integral = 0
+        self.output_history = []  # Lista para el filtro de media móvil
+        self.window_size = 5  # Tamaño de la ventana para el filtro de media móvil
 
     def calculate(self, setpoint, pressure_measured):
         error = setpoint - pressure_measured
@@ -113,7 +144,7 @@ class PIDController:
         # Término Derivativo
         D = self.Kd * (error - self.prev_error) / self.dt
 
-        # Salida del controlador PID sin ajustar
+        # Salida del controlador PID
         output = P + I + D
 
         # Limitar el valor del output al rango especificado (por ejemplo, -100 a 100)
@@ -125,5 +156,59 @@ class PIDController:
         else:
             output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
 
+        # Aplicar un filtro de media móvil para suavizar la señal
+        self.output_history.append(output_ajustado)
+        if len(self.output_history) > self.window_size:
+            self.output_history.pop(0)
+        filtered_output = sum(self.output_history) / len(self.output_history)
+
         self.prev_error = error
-        return output_ajustado, error
+        return filtered_output, error
+"""
+#Filtro Exponencial Suavizado
+class PIDController:
+    def __init__(self, dt, min_output=-100, max_output=100):
+        # self.Kp = 0.1
+        # self.Ki = 0.002
+        # self.Kd = 0.05
+        self.Kp = 0.054236
+        self.Ki = 0.0010894
+        self.Kd = 0.25123
+        self.dt = dt
+        self.min_output = min_output
+        self.max_output = max_output
+        self.prev_error = 0
+        self.integral = 0
+        self.filtered_output = 0  # Salida filtrada inicial
+        self.alpha = 0.2  # Factor de suavizado para el filtro exponencial
+
+    def calculate(self, setpoint, pressure_measured):
+        error = setpoint - pressure_measured
+
+        # Término Proporcional
+        P = self.Kp * error
+
+        # Término Integral con integración trapezoidal
+        self.integral += (error + self.prev_error) / 2 * self.dt
+        I = self.Ki * self.integral
+
+        # Término Derivativo
+        D = self.Kd * (error - self.prev_error) / self.dt
+
+        # Salida del controlador PID
+        output = P + I + D
+
+        # Limitar el valor del output al rango especificado (por ejemplo, -100 a 100)
+        output = max(self.min_output, min(self.max_output, output))
+
+        # Escalar el output de -100 a 100 al rango de 0 a 5V
+        if error <= 0.5:
+            output_ajustado = 0 
+        else:
+            output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
+
+        # Aplicar un filtro exponencial para suavizar la señal
+        self.filtered_output = self.alpha * output_ajustado + (1 - self.alpha) * self.filtered_output
+
+        self.prev_error = error
+        return self.filtered_output, error
