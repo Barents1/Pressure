@@ -42,7 +42,6 @@ class PressureReaderThread(QtCore.QThread):
             self.pressure_value_reader_signal.emit(round(value_pressure, 6))
             self.caj_value_reader_signal.emit(round(value_caj, 6))
 
-            #self.emit_pressure_difference(value_pressure)
             self.emit_pressure_difference(error_dif)
             self.process_set_point(value_pressure)
 
@@ -55,9 +54,6 @@ class PressureReaderThread(QtCore.QThread):
         if self.change_pressure is None:
             self.change_pressure = value_pressure
         else:
-            #difference = round(value_pressure - self.change_pressure, 6)
-            #self.value_change_reader_pressure.emit(difference)
-            #self.change_pressure = value_pressure
             self.value_change_reader_pressure.emit(value_pressure)
 
     def process_set_point(self, value_pressure):
@@ -88,23 +84,20 @@ class PressureReaderThread(QtCore.QThread):
             self.change_state_set_point(False, num_point)
 
     def stabilization(self, error):
-        # Usar una ventana de promediado para reducir fluctuaciones
         if self.i == 0:
-            self.error_list = []  # Lista para acumular errores
-        self.error_list.append(error)
+            testing = 1
+        else:
+            testing = error
+
         self.i += 1
+        if -1 <= testing <= 0:
+            self.accumulator += 1
         
-        # Evaluar estabilidad después de 5 lecturas (ajustable)
-        if len(self.error_list) >= 5:
-            avg_error = sum(self.error_list) / len(self.error_list)
-            if abs(avg_error) <= 0.5:  # Ajusta el umbral según tu necesidad
-                self.accumulator += 1
-            self.error_list.pop(0)  # Descartar la lectura más antigua
-        
-        if self.accumulator >= 4:  # Ajustar según los resultados
+        if self.accumulator >= 4:
             result = 1
             self.i = 0
             self.accumulator = 0
+            self.pid.filtro_activo = False
             print("Estabilización alcanzada. Reiniciando variables.")
         else:
             result = 0
@@ -309,12 +302,16 @@ class ConnectionManager:
         if self.reader_thread and self.reader_thread.isRunning():
             self.control.active_valvule()
             self.reader_thread.change_state_set_point(True, num_point)
-            self.state_led_motor = True
-            self.state_led_sealed = True
-            self.color_led_device()
             time.sleep(0.1)
             state = self.control.check_port_digital()
-            print(f"estado valvula = {state}")
+            if state:   
+                self.state_led_motor = True
+                self.state_led_sealed = True
+            else:
+                self.state_led_motor = False
+                self.state_led_sealed = False
+
+            self.color_led_device()
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Inicie el programa")
 
@@ -367,13 +364,18 @@ class ConnectionManager:
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
             self.control.stop_all_tasks()
+
+            time.sleep(0.1)
             state = self.control.check_port_digital()
-            print(f"estado valvula = {state}")
-            self.reader_thread.change_state_set_point(False, num_point)
-            self.state_led_motor = False
-            self.state_led_sealed = False
+            if state:   
+                self.state_led_motor = True
+                self.state_led_sealed = True
+            else:
+                self.state_led_motor = False
+                self.state_led_sealed = False
+
             self.color_led_device()
-            print("detenido")
+            self.reader_thread.change_state_set_point(False, num_point)
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Inicie el programa")
 
@@ -384,11 +386,13 @@ class ConnectionManager:
         )
 
     def close_bomb(self):
+        self.stop_device()
+        
         if self.data_thread:
             self.data_thread.stop()
         if self.reader_thread:
             self.reader_thread.stop()
-        self.stop_device()
+        
         self.conn_bomb = self.connection.close_connection()
         self.state_led_data = False
         self.color_led_data()

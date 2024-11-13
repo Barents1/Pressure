@@ -182,6 +182,10 @@ class PIDController:
         self.filtered_output = 0  # Salida filtrada inicial
         self.alpha = 0.2  # Factor de suavizado para el filtro exponencial
 
+        self.umbral_positivo = 5  # Umbral para activar el filtro
+        self.umbral_negativo = -5  # Umbral para desactivar el filtro
+        self.filtro_activo = False
+
     def calculate(self, setpoint, pressure_measured):
         error = setpoint - pressure_measured
 
@@ -202,13 +206,30 @@ class PIDController:
         output = max(self.min_output, min(self.max_output, output))
 
         # Escalar el output de -100 a 100 al rango de 0 a 5V
-        if error <= 0.5:
-            output_ajustado = 0 
-        else:
-            output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
+        # if abs(error) <= 0.5:
+        #     output_ajustado = 0 
+        # else:
+        #     output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
 
-        # Aplicar un filtro exponencial para suavizar la señal
-        self.filtered_output = self.alpha * output_ajustado + (1 - self.alpha) * self.filtered_output
+        output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
+
+        # Lógica de activación del filtro
+        if self.umbral_positivo >= error >= self.umbral_negativo:
+            self.filtro_activo = True
+            self.Kp = 0.1
+            self.Ki = 0.0
+            self.Kd = 0.0
+
+        # Aplicar el filtro solo si está activo
+        if self.filtro_activo:
+            self.filtered_output = self.alpha * output_ajustado + (1 - self.alpha) * self.filtered_output
+        else:
+            self.filtered_output = output_ajustado
+
+        if self.filtro_activo:
+            print("filtro activado")
+        else:
+            print("filtro desactivado")
 
         self.prev_error = error
         return self.filtered_output, error

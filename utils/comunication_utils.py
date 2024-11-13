@@ -12,7 +12,7 @@ class ComunicationPressure:
         self.pa_a0 = -0.179608
         self.pa_a1 = 1.0000782
         self.data_test = 925.011
-        self.direction = 1  # 1 para subir, -1 para bajar
+        self.direction = 1
 
     """
     def value_pressure(self):
