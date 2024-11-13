@@ -9,6 +9,7 @@ import os
 import csv
 from datetime import datetime
 
+
 class PressureReaderThread(QtCore.QThread):
     pressure_value_reader_signal = QtCore.pyqtSignal(float)
     caj_value_reader_signal = QtCore.pyqtSignal(float)
@@ -28,6 +29,8 @@ class PressureReaderThread(QtCore.QThread):
         self.current_pressure_value = None
         self.i = 0
         self.accumulator = 0
+        self.start_time = None
+        self.timer_active = False
 
     def run(self):
         comunication = ComunicationPressure(self.conn_bomb)
@@ -77,11 +80,20 @@ class PressureReaderThread(QtCore.QThread):
         self.set_point_error_signal.emit(error)
 
         result, acum = self.stabilization(error)
+
+        if acum == 1 and not self.timer_active:
+            print("Activando temporizador de 30 segundos...")
+            self.start_time = time.time()  # Capturamos el tiempo actual
+            self.timer_active = True
+
+        if self.timer_active and (time.time() - self.start_time) >= 30:
+            self.event_time()
+
         print(f"estabilizador = {result} y acumulador = {acum}")
-        if result == 1:
-            print("estabilizado")
-            self.control.stop_all_tasks()
-            self.change_state_set_point(False, num_point)
+        # if result == 1:
+        #     print("estabilizado")
+        #     self.control.stop_all_tasks()
+        #     self.change_state_set_point(False, num_point)
 
     def stabilization(self, error):
         if self.i == 0:
@@ -103,6 +115,12 @@ class PressureReaderThread(QtCore.QThread):
             result = 0
         
         return result, self.accumulator
+    
+    def event_time(self):
+        print("Evento de 30 segundos completado")
+        self.timer_active = False  # Reiniciamos la bandera del temporizador
+        self.control.stop_all_tasks()
+        self.change_state_set_point(False, 732)
 
 class PressureDataThread(QtCore.QThread):
     data_ready = QtCore.pyqtSignal(list)

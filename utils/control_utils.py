@@ -182,8 +182,8 @@ class PIDController:
         self.filtered_output = 0  # Salida filtrada inicial
         self.alpha = 0.2  # Factor de suavizado para el filtro exponencial
 
-        self.umbral_positivo = 5  # Umbral para activar el filtro
-        self.umbral_negativo = -5  # Umbral para desactivar el filtro
+        self.umbral_positivo = 4  # Umbral para activar el filtro
+        self.umbral_negativo = -4  # Umbral para desactivar el filtro
         self.filtro_activo = False
 
     def calculate(self, setpoint, pressure_measured):
