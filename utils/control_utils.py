@@ -1,8 +1,33 @@
 import numpy as np
 from PyDAQmx import Task
+from PyDAQmx.DAQmxFunctions import DAQmxGetSysDevNames
 from PyDAQmx.DAQmxConstants import DAQmx_Val_Volts, DAQmx_Val_GroupByChannel, DAQmx_Val_ChanForAllLines
 from PyDAQmx.DAQmxFunctions import DAQmxWriteAnalogF64, DAQmxReadDigitalU32, DAQmxWriteDigitalU32, DAQmxStartTask, DAQmxStopTask
 import ctypes
+
+def is_device_available(device_name="Dev1"):
+    buffer_size = 256
+    device_list = ctypes.create_string_buffer(buffer_size)
+
+    try:
+        DAQmxGetSysDevNames(device_list, buffer_size)
+        available_devices = device_list.value.decode("utf-8").split(", ")
+        
+        if not available_devices or available_devices == ['']:
+            print("No hay dispositivos disponibles.")
+            return False
+        
+        # Verificar si el dispositivo solicitado está en la lista
+        if device_name in available_devices:
+            print(f"Dispositivo {device_name} disponible.")
+            return True
+        else:
+            print(f"Dispositivo {device_name} no encontrado. Dispositivos disponibles: {available_devices}")
+            return False
+
+    except Exception as e:
+        print(f"Error al verificar el dispositivo: {e}")
+        return False
 
 class AnalogOutput(Task):
     def __init__(self, analog_channel):
@@ -84,8 +109,14 @@ class DigitalOutput(Task):
 
 class ControlDevice:
     def __init__(self):
-        analog_channel = "Dev1/ao0"
-        digital_channel = "Dev1/port0"
+        self.device_name = "Dev1"
+        
+        if not is_device_available(self.device_name):
+            raise Exception(f"El dispositivo {self.device_name} no está disponible.")
+        
+        analog_channel = f"{self.device_name}/ao0"
+        digital_channel = f"{self.device_name}/port0"
+        
         self.analog_output = AnalogOutput(analog_channel)
         self.digital_output = DigitalOutput(digital_channel)
 

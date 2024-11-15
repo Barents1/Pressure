@@ -39,35 +39,35 @@ class ComunicationPressure:
             return
         try:
             msg = "PRR\r\n"
-            self.conn_bomb.write(msg.encode('ascii'))
-            time.sleep(0.1)
-            #time.sleep(0.5)
+            #self.conn_bomb.write(msg.encode('ascii'))
+            #time.sleep(0.1)
+            time.sleep(0.5)
             
-            # request, error = self.value_pressure()
-            # num_1 = request
-            # num_2 = error
+            request, error = self.value_pressure()
+            num_1 = request
+            num_2 = error
 
-            request = ""
-            while True:
-                chunk = self.conn_bomb.readline(50).decode('ascii')
-                request += chunk
-                if '\n' in chunk:
-                    break
+            # request = ""
+            # while True:
+            #     chunk = self.conn_bomb.readline(50).decode('ascii')
+            #     request += chunk
+            #     if '\n' in chunk:
+            #         break
             
-            request = request.strip()
-            numbers = re.findall(r'-?\d+\.\d+', request)
+            # request = request.strip()
+            # numbers = re.findall(r'-?\d+\.\d+', request)
 
-            if len(numbers) >= 2:
-                num_1 = float(numbers[0])
-                num_2 = float(numbers[1])
-                print(f"Presión obtenida: {num_1} hPa, Cambio de presión: {num_2} hPa/s")
-                return num_1, num_2
-            else:
-                print("No se encontraron suficientes valores numéricos.")
-                return 0, 0
+            # if len(numbers) >= 2:
+            #     num_1 = float(numbers[0])
+            #     num_2 = float(numbers[1])
+            #     print(f"Presión obtenida: {num_1} hPa, Cambio de presión: {num_2} hPa/s")
+            #     return num_1, num_2
+            # else:
+            #     print("No se encontraron suficientes valores numéricos.")
+            #     return 0, 0
             
-            # print(f"Respuesta del dispositivo: {num_1}, {num_2}")
-            # return num_1, num_2
+            print(f"Respuesta del dispositivo: {num_1}, {num_2}")
+            return num_1, num_2
 
         except serial.SerialException as e:
             print(f"Error al enviar la instruccion: {e}")

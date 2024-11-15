@@ -21,7 +21,11 @@ class PressureReaderThread(QtCore.QThread):
         super().__init__()
         self.conn_bomb = conn_bomb
         self.conn_manager = conn_manager
-        self.control = ControlDevice()
+        try:
+            self.control = ControlDevice()
+        except Exception as e:
+            print(f"Advertencia: {e}")
+            self.control = None
         self.is_running = True
         self.change_pressure = None
         self.state_set_point = False
@@ -76,16 +80,18 @@ class PressureReaderThread(QtCore.QThread):
     def set_point(self, num_point, value_pressure):
         output, error = self.pid.calculate(num_point, value_pressure)
         print(f"Presión actual: {value_pressure}, Setpoint: {num_point}, Error: {error:.3f}")
+        if self.control is None:
+            self.change_state_set_point(False, num_point)
+        else:
+            self.control.up_pressure(output)
+            self.set_point_error_signal.emit(error)
+            result, acum = self.stabilization(error)
 
-        self.control.up_pressure(output)
-        self.set_point_error_signal.emit(error)
-        result, acum = self.stabilization(error)
-
-        print(f"estabilizador = {result} y acumulador = {acum}")
-        if result == 1:
-            print("estabilizado")
-            self.conn_manager.stop_device()
-            #self.change_state_set_point(False, num_point)
+            print(f"estabilizador = {result} y acumulador = {acum}")
+            if result == 1:
+                print("estabilizado")
+                self.conn_manager.stop_device()
+                #self.change_state_set_point(False, num_point)
 
     def stabilization(self, error):
         if self.i == 0:
@@ -225,7 +231,11 @@ class ConnectionManager:
         self.main_window = main_window
         self.ui_manager = ui_manager
         self.connection = ConnectionUtils()
-        self.control = ControlDevice()
+        try:
+            self.control = ControlDevice()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, "Informacion", f"Advertencia: {e}")
+            self.control = None
         self.conn_bomb = None
         self.data_thread = None
         self.reader_thread = None
@@ -319,11 +329,15 @@ class ConnectionManager:
     def active_set_point(self):
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
-            self.control.active_valvule()
-            self.handle_reader_thread(True, num_point)
-            self.main_window.inp_set_point_establish.setText(str(num_point))
-            self.update_led_state()
-            return True
+            if self.control is None:
+                QtWidgets.QMessageBox.information(None, "Información", "Puerto Dev1 no encontrado")
+                return False
+            else:
+                self.control.active_valvule()
+                self.handle_reader_thread(True, num_point)
+                self.main_window.inp_set_point_establish.setText(str(num_point))
+                self.update_led_state()
+                return True
         else:
             QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
             return False
@@ -389,10 +403,13 @@ class ConnectionManager:
     def stop_device(self):
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
-            self.control.stop_all_tasks()
-            self.update_led_state()
-            self.handle_reader_thread(False, num_point)
-            return True  # Programa en ejecución
+            if self.control is None:
+                return False
+            else:
+                self.control.stop_all_tasks()
+                self.update_led_state()
+                self.handle_reader_thread(False, num_point)
+                return True  # Programa en ejecución
         else:
             QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
             return False
