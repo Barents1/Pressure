@@ -168,12 +168,12 @@ class PIDController:
 #Filtro Exponencial Suavizado
 class PIDController:
     def __init__(self, dt, min_output=-100, max_output=100):
-        # self.Kp = 0.1
-        # self.Ki = 0.002
-        # self.Kd = 0.05
-        self.Kp = 0.054236
-        self.Ki = 0.0010894
-        self.Kd = 0.25123
+        self.Kp = 0.1
+        self.Ki = 0.002
+        self.Kd = 0.05
+        # self.Kp = 0.054236
+        # self.Ki = 0.0010894
+        # self.Kd = 0.25123
         self.dt = dt
         self.min_output = min_output
         self.max_output = max_output
@@ -181,10 +181,13 @@ class PIDController:
         self.integral = 0
         self.filtered_output = 0  # Salida filtrada inicial
         self.alpha = 0.2  # Factor de suavizado para el filtro exponencial
-
-        self.umbral_positivo = 4  # Umbral para activar el filtro
-        self.umbral_negativo = -4  # Umbral para desactivar el filtro
+        self.umbral_positivo = 4  # Define un valor por defecto o pásalo como parámetro
+        self.umbral_negativo = -4
+        
         self.filtro_activo = False
+        self.umbral_filtro = 10  # Ajustar este umbral según sea necesario
+
+        self.antiwindup_limit = 50
 
     def calculate(self, setpoint, pressure_measured):
         error = setpoint - pressure_measured
@@ -194,6 +197,7 @@ class PIDController:
 
         # Término Integral con integración trapezoidal
         self.integral += (error + self.prev_error) / 2 * self.dt
+        self.integral = max(-self.antiwindup_limit, min(self.integral, self.antiwindup_limit))
         I = self.Ki * self.integral
 
         # Término Derivativo
@@ -204,21 +208,11 @@ class PIDController:
 
         # Limitar el valor del output al rango especificado (por ejemplo, -100 a 100)
         output = max(self.min_output, min(self.max_output, output))
-
-        # Escalar el output de -100 a 100 al rango de 0 a 5V
-        # if abs(error) <= 0.5:
-        #     output_ajustado = 0 
-        # else:
-        #     output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
-
         output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
 
         # Lógica de activación del filtro
         if self.umbral_positivo >= error >= self.umbral_negativo:
             self.filtro_activo = True
-            self.Kp = 0.1
-            self.Ki = 0.0
-            self.Kd = 0.0
 
         # Aplicar el filtro solo si está activo
         if self.filtro_activo:

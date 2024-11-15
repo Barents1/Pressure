@@ -11,7 +11,9 @@ class ComunicationPressure:
         self.patron_saj = None
         self.pa_a0 = -0.179608
         self.pa_a1 = 1.0000782
-        self.data_test = 925.011
+        self.a0 = 0
+        self.a1 = 0
+        self.data_test = 725.011
         self.direction = 1
 
     """
@@ -21,9 +23,9 @@ class ComunicationPressure:
         return num
     """
     def value_pressure(self):
-        if self.direction == 1 and self.data_test >= 950:
+        if self.direction == 1 and self.data_test >= 750:
             self.direction = -1
-        elif self.direction == -1 and self.data_test <= 930:
+        elif self.direction == -1 and self.data_test <= 735:
             self.direction = 1
 
         self.data_test += self.direction * 1.011
@@ -38,8 +40,8 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             self.conn_bomb.write(msg.encode('ascii'))
-            #time.sleep(0.1)
-            time.sleep(0.5)
+            time.sleep(0.1)
+            #time.sleep(0.5)
             
             # request, error = self.value_pressure()
             # num_1 = request
@@ -71,10 +73,10 @@ class ComunicationPressure:
             print(f"Error al enviar la instruccion: {e}")
             return 0, 0
 
-    def get_patron_caj(self, pressure_value):
+    def get_patron_caj(self, pressure_value, a0, a1):
         if pressure_value is None:
-            pressure_value = 0  # o cualquier valor predeterminado
-        return (pressure_value * self.pa_a1) + self.pa_a0
+            pressure_value = 0
+        return (pressure_value * a1) + a0
 
     def get_date(self):
         current_date = datetime.now().strftime('%d/%m/%Y')
@@ -84,3 +86,6 @@ class ComunicationPressure:
         current_time = datetime.now().strftime('%H:%M:%S')
         return current_time
     
+    def set_value_a(self, a0, a1):
+        self.a0 = a0
+        self.a1 = a1

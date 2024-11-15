@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QSlider, QLabel, QGraphicsView, QGraphicsScene, QGraphicsRectItem
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QBrush, QPen, QColor
+from styles.style_pyqt5 import Style
 
 class TankGraphicsView(QGraphicsView):
     def __init__(self, *args, **kwargs):
@@ -49,6 +50,7 @@ class SliderExample(QWidget):
         
         # Create and set up the label
         self.label = QLabel("Valor: 500")
+        Style.label_sub_instructiol_styles([self.label])
         
         # Create and set up the tank graphics view
         self.tank_view = TankGraphicsView()
@@ -63,6 +65,7 @@ class SliderExample(QWidget):
         layout.addWidget(self.tank_view)
         
         self.setLayout(layout)
+        
 
     def update_label_and_tank(self, value):
         self.label.setText(f"Valor: {value}")

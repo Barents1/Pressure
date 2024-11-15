@@ -17,9 +17,10 @@ class PressureReaderThread(QtCore.QThread):
     pressure_updated_signal = QtCore.pyqtSignal(float)
     set_point_error_signal = QtCore.pyqtSignal(float)
 
-    def __init__(self, conn_bomb):
+    def __init__(self, conn_bomb, a0, a1, conn_manager):
         super().__init__()
         self.conn_bomb = conn_bomb
+        self.conn_manager = conn_manager
         self.control = ControlDevice()
         self.is_running = True
         self.change_pressure = None
@@ -27,16 +28,16 @@ class PressureReaderThread(QtCore.QThread):
         self.set_point_value = 700
         self.pid = PIDController(dt=2, min_output=0, max_output=5)
         self.current_pressure_value = None
+        self.a0 = a0
+        self.a1 = a1
         self.i = 0
         self.accumulator = 0
-        self.start_time = None
-        self.timer_active = False
 
     def run(self):
         comunication = ComunicationPressure(self.conn_bomb)
         while self.is_running:
             value_pressure, error_dif = comunication.get_pressure()
-            value_caj = comunication.get_patron_caj(value_pressure)
+            value_caj = comunication.get_patron_caj(value_pressure, self.a0, self.a1)
 
             # Actualiza el valor de la presión
             self.update_pressure_value(value_pressure)
@@ -78,22 +79,13 @@ class PressureReaderThread(QtCore.QThread):
 
         self.control.up_pressure(output)
         self.set_point_error_signal.emit(error)
-
         result, acum = self.stabilization(error)
 
-        if acum == 1 and not self.timer_active:
-            print("Activando temporizador de 30 segundos...")
-            self.start_time = time.time()  # Capturamos el tiempo actual
-            self.timer_active = True
-
-        if self.timer_active and (time.time() - self.start_time) >= 30:
-            self.event_time()
-
         print(f"estabilizador = {result} y acumulador = {acum}")
-        # if result == 1:
-        #     print("estabilizado")
-        #     self.control.stop_all_tasks()
-        #     self.change_state_set_point(False, num_point)
+        if result == 1:
+            print("estabilizado")
+            self.conn_manager.stop_device()
+            #self.change_state_set_point(False, num_point)
 
     def stabilization(self, error):
         if self.i == 0:
@@ -105,7 +97,7 @@ class PressureReaderThread(QtCore.QThread):
         if -1 <= testing <= 0:
             self.accumulator += 1
         
-        if self.accumulator >= 4:
+        if self.accumulator >= 3:
             result = 1
             self.i = 0
             self.accumulator = 0
@@ -115,19 +107,13 @@ class PressureReaderThread(QtCore.QThread):
             result = 0
         
         return result, self.accumulator
-    
-    def event_time(self):
-        print("Evento de 30 segundos completado")
-        self.timer_active = False  # Reiniciamos la bandera del temporizador
-        self.control.stop_all_tasks()
-        self.change_state_set_point(False, 732)
 
 class PressureDataThread(QtCore.QThread):
     data_ready = QtCore.pyqtSignal(list)
     finished_data_signal = QtCore.pyqtSignal(float)
     time_remaining_signal = QtCore.pyqtSignal(float)
 
-    def __init__(self, conn_bomb, num_chk, time_duration, output_dir, enable_time_check):
+    def __init__(self, conn_bomb, num_chk, time_duration, output_dir, enable_time_check, a0, a1):
         super().__init__()
         self.conn_bomb = conn_bomb
         self.num_chk = num_chk
@@ -141,6 +127,8 @@ class PressureDataThread(QtCore.QThread):
         self.paused = True
         self.paused_time = 0
         self.pause_start_time = None
+        self.pa_a0 = a0
+        self.pa_a1 = a1
 
     def update_pressure_value(self, pressure_value):
         self.current_pressure_value = pressure_value
@@ -153,7 +141,6 @@ class PressureDataThread(QtCore.QThread):
 
     def run(self):
         comunication = ComunicationPressure(self.conn_bomb)
-        pa_a0, pa_a1 = str(comunication.pa_a0).replace('.', ','), str(comunication.pa_a1).replace('.', ',')
 
         # Esperar hasta que save_data sea True antes de iniciar el cronómetro
         while not self.save_data:
@@ -174,7 +161,7 @@ class PressureDataThread(QtCore.QThread):
                     time.sleep(0.1)
                     continue
 
-                self.write_csv_data(writer, comunication, pa_a0, pa_a1)
+                self.write_csv_data(writer, comunication, self.pa_a0, self.pa_a1)
 
                 # Ajustar el tiempo de pausa si corresponde
                 if self.pause_start_time:
@@ -182,7 +169,11 @@ class PressureDataThread(QtCore.QThread):
                     self.pause_start_time = None  # Resetear después de calcular
 
                 elapsed_time = time.time() - time_initial - self.paused_time
-                time_remaining = self.time_duration - elapsed_time
+
+                if not self.enable_time_check:
+                    time_remaining = 0
+                else:
+                    time_remaining = self.time_duration - elapsed_time
 
                 self.time_remaining_signal.emit(round(time_remaining, 2))
 
@@ -200,14 +191,16 @@ class PressureDataThread(QtCore.QThread):
                 print("Warning: self.current_pressure_value es None. Usando valor predeterminado 0.0.")
                 self.current_pressure_value = 0.0
             patron_saj = f"{round(self.current_pressure_value, 6):.6f}".replace('.', ',')
-            patron_caj = f"{round(comunication.get_patron_caj(self.current_pressure_value), 6):.6f}".replace('.', ',')
+            patron_caj = f"{round(comunication.get_patron_caj(self.current_pressure_value, self.pa_a0, self.pa_a1), 6):.6f}".replace('.', ',')
             list_data = [date_data, time_data, patron_saj, pa_a0, pa_a1, patron_caj]
             self.data_ready.emit(list_data)
             writer.writerow(list_data)
 
-    def update_num_chk(self, new_num_chk):
+    def update_num_chk(self, new_num_chk, a0, a1):
         self._lock.lock()
         self.num_chk = new_num_chk
+        self.pa_a0 = a0
+        self.pa_a1 = a1
         self._lock.unlock()
 
     def pause_saving(self):
@@ -236,10 +229,11 @@ class ConnectionManager:
         self.conn_bomb = None
         self.data_thread = None
         self.reader_thread = None
-        self.state_led_data = True
+        self.state_led_data = False
         self.state_led_motor = False
         self.state_led_sealed = False
         self.color_led_device()
+        self.color_led_data()
 
     def load_port(self):
         self.connection.load_port(self.main_window.cbx_conn)
@@ -250,17 +244,20 @@ class ConnectionManager:
     def connect_device(self):
         if not self.conn_bomb:
             self.conn_bomb = self.connection.connection_bomb_util(self.main_window.cbx_conn)
+            self.start_device()
+            return True
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Ya existe una conexion")
+            return False
 
     def start_device(self):
         if self.conn_bomb:
             self.main_window.tbl_data.setRowCount(0)
             num_chk = int(self.main_window.inp_sync.text())
-            
             time_duration = float(self.main_window.inp_time_duration.text().replace(',', '.'))
-
-            self.ged_data_pressure(num_chk, time_duration)
+            a0 = float(self.main_window.inp_a0.text().replace(',', '.'))
+            a1 = float(self.main_window.inp_a1.text().replace(',', '.'))
+            self.ged_data_pressure(num_chk, time_duration, a0, a1)
         else:
             QtWidgets.QMessageBox.information(None, "Informacion", "Realice la conexion")
 
@@ -271,15 +268,15 @@ class ConnectionManager:
         self.main_window.led_motor.setStyleSheet("background-color: green;" if self.state_led_motor else "background-color: red;")
         self.main_window.led_sealed.setStyleSheet("background-color: green;" if self.state_led_sealed else "background-color: red;")
 
-    def ged_data_pressure(self, num_chk, time_duration):
+    def ged_data_pressure(self, num_chk, time_duration, a0, a1):
         self.state_led_data = False
         self.color_led_data()
         _, output_dir = self.connection.read_or_create_file('file/data_rute.txt')
 
         enable_time_check = self.main_window.time_enable
 
-        self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check)
-        self.reader_thread = PressureReaderThread(self.conn_bomb)
+        self.data_thread = PressureDataThread(self.conn_bomb, num_chk, time_duration, output_dir, enable_time_check, a0, a1)
+        self.reader_thread = PressureReaderThread(self.conn_bomb, a0, a1 ,self)
 
         self.reader_thread.pressure_updated_signal.connect(self.data_thread.update_pressure_value)
 
@@ -302,11 +299,15 @@ class ConnectionManager:
         num_chk = int(self.main_window.inp_sync.text())
         if self.data_thread and self.data_thread.isRunning():
             self.state_led_data = True
+            a0 = float(self.main_window.inp_a0.text().replace(',', '.'))
+            a1 = float(self.main_window.inp_a1.text().replace(',', '.'))
             self.data_thread.resume_saving()
-            self.data_thread.update_num_chk(num_chk)
+            self.data_thread.update_num_chk(num_chk, a0, a1)
         else:
-            print("El hilo no está corriendo.")
-            self.state_led_data = True
+            QtWidgets.QMessageBox.information(
+                None, "Advertencia", f"Inicie el programa"
+            )
+            self.state_led_data = False
         self.color_led_data()
 
     def update_remaining_time(self, time_remaining):
@@ -319,26 +320,20 @@ class ConnectionManager:
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
             self.control.active_valvule()
-            self.reader_thread.change_state_set_point(True, num_point)
-            time.sleep(0.1)
-            state = self.control.check_port_digital()
-            if state:   
-                self.state_led_motor = True
-                self.state_led_sealed = True
-            else:
-                self.state_led_motor = False
-                self.state_led_sealed = False
-
-            self.color_led_device()
+            self.handle_reader_thread(True, num_point)
+            self.main_window.inp_set_point_establish.setText(str(num_point))
+            self.update_led_state()
+            return True
         else:
-            QtWidgets.QMessageBox.information(None, "Informacion", "Inicie el programa")
+            QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
+            return False
 
     def stop_data_saving(self):
         if self.data_thread and self.data_thread.isRunning():
             self.data_thread.pause_saving()
             self.state_led_data = False
         else:
-            print("El hilo no está corriendo.")
+            QtWidgets.QMessageBox.information(None, "Advertencia", "Inicie el programa")
             self.state_led_data = False
         self.color_led_data()
 
@@ -378,24 +373,29 @@ class ConnectionManager:
         if self.conn_bomb:
             self.main_window.inp_change_pressure.setText(value_change)
 
+    def update_led_state(self):
+        time.sleep(0.1)
+        state = self.control.check_port_digital()
+        self.state_led_motor = state
+        self.state_led_sealed = state
+        self.color_led_device()
+
+    def handle_reader_thread(self, is_active, num_point):
+        if self.reader_thread and self.reader_thread.isRunning():
+            self.reader_thread.change_state_set_point(is_active, num_point)
+        else:
+            QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
+
     def stop_device(self):
         num_point = int(self.main_window.inp_set_point.text())
         if self.reader_thread and self.reader_thread.isRunning():
             self.control.stop_all_tasks()
-
-            time.sleep(0.1)
-            state = self.control.check_port_digital()
-            if state:   
-                self.state_led_motor = True
-                self.state_led_sealed = True
-            else:
-                self.state_led_motor = False
-                self.state_led_sealed = False
-
-            self.color_led_device()
-            self.reader_thread.change_state_set_point(False, num_point)
+            self.update_led_state()
+            self.handle_reader_thread(False, num_point)
+            return True  # Programa en ejecución
         else:
-            QtWidgets.QMessageBox.information(None, "Informacion", "Inicie el programa")
+            QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
+            return False
 
     def show_finished_message(self, elapsed_time):
         self.close_bomb()
@@ -405,12 +405,10 @@ class ConnectionManager:
 
     def close_bomb(self):
         self.stop_device()
-        
         if self.data_thread:
             self.data_thread.stop()
         if self.reader_thread:
             self.reader_thread.stop()
-        
         self.conn_bomb = self.connection.close_connection()
         self.state_led_data = False
         self.color_led_data()
