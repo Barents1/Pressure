@@ -215,9 +215,9 @@ class PIDController:
         self.umbral_positivo = 4  # Define un valor por defecto o pásalo como parámetro
         self.umbral_negativo = -4
         
-        self.filtro_activo = False
+        self.filtro_active = False
         self.umbral_filtro = 10  # Ajustar este umbral según sea necesario
-
+        self.index_filter = 0
         self.antiwindup_limit = 50
 
     def calculate(self, setpoint, pressure_measured):
@@ -227,8 +227,11 @@ class PIDController:
         P = self.Kp * error
 
         # Término Integral con integración trapezoidal
-        self.integral += (error + self.prev_error) / 2 * self.dt
-        self.integral = max(-self.antiwindup_limit, min(self.integral, self.antiwindup_limit))
+        if self.index_filter == 0 and error <= 20 and error > 0:
+            self.integral = max(-self.antiwindup_limit, min(self.integral, self.antiwindup_limit))
+            self.index_filter = 1
+        else:
+            self.integral += (error + self.prev_error) / 2 * self.dt
         I = self.Ki * self.integral
 
         # Término Derivativo
@@ -243,15 +246,15 @@ class PIDController:
 
         # Lógica de activación del filtro
         if self.umbral_positivo >= error >= self.umbral_negativo:
-            self.filtro_activo = True
+            self.filtro_active = True
 
         # Aplicar el filtro solo si está activo
-        if self.filtro_activo:
+        if self.filtro_active:
             self.filtered_output = self.alpha * output_ajustado + (1 - self.alpha) * self.filtered_output
         else:
             self.filtered_output = output_ajustado
 
-        if self.filtro_activo:
+        if self.filtro_active:
             print("filtro activado")
         else:
             print("filtro desactivado")

@@ -103,11 +103,12 @@ class PressureReaderThread(QtCore.QThread):
         if -1 <= testing <= 0:
             self.accumulator += 1
         
-        if self.accumulator >= 3:
+        if self.accumulator >= 2:
             result = 1
             self.i = 0
             self.accumulator = 0
-            self.pid.filtro_activo = False
+            self.pid.filtro_active = False
+            self.pid.index_filter = 0
             print("Estabilización alcanzada. Reiniciando variables.")
         else:
             result = 0
