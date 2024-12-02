@@ -13,7 +13,7 @@ class ComunicationPressure:
         self.pa_a1 = 1.0000782
         self.a0 = 0
         self.a1 = 0
-        self.data_test = 850.011
+        self.data_test = 600.011
         self.direction = 1
 
     """
@@ -23,9 +23,9 @@ class ComunicationPressure:
         return num
     """
     def value_pressure(self):
-        if self.direction == 1 and self.data_test >= 750:
+        if self.direction == 1 and self.data_test >= 575:
             self.direction = -1
-        elif self.direction == -1 and self.data_test <= 700:
+        elif self.direction == -1 and self.data_test <= 525:
             self.direction = 1
 
         self.data_test += self.direction * 1.011
@@ -40,8 +40,7 @@ class ComunicationPressure:
         try:
             msg = "PRR\r\n"
             self.conn_bomb.write(msg.encode('ascii'))
-            time.sleep(0.1)
-            #time.sleep(0.5)
+            time.sleep(0.5)
             
             # request, error = self.value_pressure()
             # num_1 = request

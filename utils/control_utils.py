@@ -1,4 +1,6 @@
 import numpy as np
+import warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 from PyDAQmx import Task
 from PyDAQmx.DAQmxFunctions import DAQmxGetSysDevNames
 from PyDAQmx.DAQmxConstants import DAQmx_Val_Volts, DAQmx_Val_GroupByChannel, DAQmx_Val_ChanForAllLines
@@ -144,58 +146,6 @@ class ControlDevice:
             print("Todas las salidas digitales están desactivadas.")
             return False
 
-# Filtro media Movil
-"""
-class PIDController:
-    def __init__(self, dt, min_output=-100, max_output=100):
-        # self.Kp = 0.1
-        # self.Ki = 0.002
-        # self.Kd = 0.05
-        self.Kp = 0.054236
-        self.Ki = 0.0010894
-        self.Kd = 0.25123
-        self.dt = dt
-        self.min_output = min_output
-        self.max_output = max_output
-        self.prev_error = 0
-        self.integral = 0
-        self.output_history = []  # Lista para el filtro de media móvil
-        self.window_size = 5  # Tamaño de la ventana para el filtro de media móvil
-
-    def calculate(self, setpoint, pressure_measured):
-        error = setpoint - pressure_measured
-
-        # Término Proporcional
-        P = self.Kp * error
-
-        # Término Integral con integración trapezoidal
-        self.integral += (error + self.prev_error) / 2 * self.dt
-        I = self.Ki * self.integral
-
-        # Término Derivativo
-        D = self.Kd * (error - self.prev_error) / self.dt
-
-        # Salida del controlador PID
-        output = P + I + D
-
-        # Limitar el valor del output al rango especificado (por ejemplo, -100 a 100)
-        output = max(self.min_output, min(self.max_output, output))
-
-        # Escalar el output de -100 a 100 al rango de 0 a 5V
-        if error <= 0.5:
-            output_ajustado = 0 
-        else:
-            output_ajustado = (output - self.min_output) / (self.max_output - self.min_output) * 5
-
-        # Aplicar un filtro de media móvil para suavizar la señal
-        self.output_history.append(output_ajustado)
-        if len(self.output_history) > self.window_size:
-            self.output_history.pop(0)
-        filtered_output = sum(self.output_history) / len(self.output_history)
-
-        self.prev_error = error
-        return filtered_output, error
-"""
 #Filtro Exponencial Suavizado
 class PIDController:
     def __init__(self, dt, min_output=-100, max_output=100):
@@ -227,7 +177,7 @@ class PIDController:
         P = self.Kp * error
 
         # Término Integral con integración trapezoidal
-        if self.index_filter == 0 and error <= 20 and error > 0:
+        if self.index_filter == 0 and error <= 50 and error > 0:
             self.integral = max(-self.antiwindup_limit, min(self.integral, self.antiwindup_limit))
             self.index_filter = 1
         else:

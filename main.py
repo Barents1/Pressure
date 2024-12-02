@@ -84,6 +84,12 @@ class MainMenu(QtWidgets.QMainWindow, Ui_MainWindow):
         Style.button_primary_style([self.btn_connect])
         Style.button_disabled_style([self.btn_finish_system, self.btn_stop_conn])
 
+    def automatic_change(self):
+        self.btn_start_conn.setEnabled(True)
+        self.btn_stop_conn.setEnabled(False)
+        Style.button_success_style([self.btn_start_conn])
+        Style.button_disabled_style([self.btn_stop_conn])
+
     def enable_button(self):
         self.inp_a0.setEnabled(True)
         self.inp_a1.setEnabled(True)

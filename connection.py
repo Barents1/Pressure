@@ -9,7 +9,6 @@ import os
 import csv
 from datetime import datetime
 
-
 class PressureReaderThread(QtCore.QThread):
     pressure_value_reader_signal = QtCore.pyqtSignal(float)
     caj_value_reader_signal = QtCore.pyqtSignal(float)
@@ -53,7 +52,7 @@ class PressureReaderThread(QtCore.QThread):
             self.emit_pressure_difference(error_dif)
             self.process_set_point(value_pressure)
 
-            time.sleep(1)
+            time.sleep(1.5)
 
     def update_pressure_value(self, pressure_value):
         self.current_pressure_value = pressure_value
@@ -92,6 +91,8 @@ class PressureReaderThread(QtCore.QThread):
                 print("estabilizado")
                 self.conn_manager.stop_device()
                 #self.change_state_set_point(False, num_point)
+            if value_pressure <= 551:
+                self.conn_manager.stop_device()
 
     def stabilization(self, error):
         if self.i == 0:
@@ -391,8 +392,12 @@ class ConnectionManager:
     def update_led_state(self):
         time.sleep(0.1)
         state = self.control.check_port_digital()
-        self.state_led_motor = state
-        self.state_led_sealed = state
+        if state:
+            self.state_led_motor = True
+            self.state_led_sealed = True
+        else:
+            self.state_led_motor = False
+            self.state_led_sealed = False
         self.color_led_device()
 
     def handle_reader_thread(self, is_active, num_point):
@@ -410,7 +415,8 @@ class ConnectionManager:
                 self.control.stop_all_tasks()
                 self.update_led_state()
                 self.handle_reader_thread(False, num_point)
-                return True  # Programa en ejecución
+                self.main_window.automatic_change()
+                return True
         else:
             QtWidgets.QMessageBox.information(None, "Información", "Inicie el programa")
             return False

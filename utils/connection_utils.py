@@ -65,6 +65,10 @@ class ConnectionUtils:
     
     def read_or_create_file(self, file_name):
         file_path = os.path.join(os.getcwd(), file_name)
+        file_directory = os.path.dirname(file_path)
+
+        if not os.path.exists(file_directory):
+            os.makedirs(file_directory, exist_ok=True)
 
         if not os.path.exists(file_path):
             with open(file_path, 'w') as file:
@@ -77,7 +81,6 @@ class ConnectionUtils:
             folder_data = self.create_month_folder()
             if folder_data is not None:
                 content = str(folder_data)
-                folder_data.mkdir(parents=True, exist_ok=True)
 
                 with open(file_path, 'w') as file:
                     file.write(content)
