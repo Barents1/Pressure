@@ -91,8 +91,10 @@ class PressureReaderThread(QtCore.QThread):
                 print("estabilizado")
                 self.conn_manager.stop_device()
                 #self.change_state_set_point(False, num_point)
-            if value_pressure <= 551:
+            if value_pressure <= 549 and value_pressure > num_point:
                 self.conn_manager.stop_device()
+                self.pid.filtro_active = False
+                self.pid.index_filter = 0
 
     def stabilization(self, error):
         if self.i == 0:

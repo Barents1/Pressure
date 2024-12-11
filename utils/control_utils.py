@@ -152,9 +152,6 @@ class PIDController:
         self.Kp = 0.1
         self.Ki = 0.002
         self.Kd = 0.05
-        # self.Kp = 0.054236
-        # self.Ki = 0.0010894
-        # self.Kd = 0.25123
         self.dt = dt
         self.min_output = min_output
         self.max_output = max_output
